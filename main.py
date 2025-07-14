@@ -1,7 +1,8 @@
 # Entry Point for the flask application
 
 from flask import Flask, redirect, request, session
-import osfrom dotenv import load_dotenv
+import os
+from dotenv import load_dotenv
 import requests
 
 # load environment variables from .env file
@@ -19,7 +20,7 @@ STRAVA_REDIRECT_URI = os.getenv('STRAVA_REDIRECT_URI')
 def home():
     return '<a href="/authorize">Connect With Strava</a>'
 
-def.route("/authorize")
+@app.route("/authorize")
 def authorize():
     auth_url = (
         f"https://www.strava.com/oauth/authorize"
@@ -39,7 +40,7 @@ def callback():
     token_response = requests.post("https://www.strava.com/oauth/token", data={
         'client_id': STRAVA_CLIENT_ID,
         'client_secret': STRAVA_CLIENT_SECRET,
-        code': code,
+        'code': code,
         'grant_type': 'authorization_code'})
     
     token_json = token_response.json()
