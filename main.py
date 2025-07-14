@@ -39,7 +39,7 @@ def authorize():
     return redirect(auth_url)
 
 # Sends you back home and lets you know what happend with your code request
-@app.route("/callback")
+@app.route("/strava/callback")
 def callback():
     code = request.args.get('code')
     if not code:
