@@ -2,6 +2,7 @@
 
 from flask import Flask, redirect, request, session
 import os
+import numpy as np
 from dotenv import load_dotenv
 import requests
 
@@ -19,8 +20,10 @@ STRAVA_REDIRECT_URI = os.getenv('STRAVA_REDIRECT_URI')
 # Starts the OATH2.0 flow with Strava
 @app.route("/")
 def home():
-    print("Home Route Hit")
-    return '<h1>Hello from PowerCurve!</h1><p><a href="/authorize">Authorize with Strava</a></p>'
+    return '''
+        <h1>Welcome to the Strava Data App</h1>
+        <p><a href="/authorize">Click here to authorize with Strava</a></p>
+        '''
 
 # Authorizing the Application to work with your strava
 @app.route("/authorize")
@@ -35,8 +38,8 @@ def authorize():
     )
     return redirect(auth_url)
 
-# Sends you back home and lets you know what happend with your code request
-@app.route("/callback")
+# Sends you to the callback page and lets go to the next step
+@app.route("/strava/callback")
 def callback():
     code = request.args.get('code')
     if not code:
@@ -45,19 +48,135 @@ def callback():
         'client_id': STRAVA_CLIENT_ID,
         'client_secret': STRAVA_CLIENT_SECRET,
         'code': code,
-        'grant_type': 'authorization_code'})
+        'grant_type': 'authorization_code'},
+        verify=False) # DISABLES TESTING WILL NEED TO BE REMOVED FOR PRODUCTION)
     
     token_json = token_response.json()
     access_token = token_json.get('access_token')
 
     if access_token:
         session['access_token'] = access_token
-        return "Authorization successful! You can now access your Strava data." 
+        # If you get a good token, let the user know and give options for next steps
+        return '''
+            <h1>Authorization successful!</h1>
+            <p><a href="/activities">View your recent cycling activities</a></p>
+            <p><a href="/powercurve">Generate your PowerCurve</a></p>
+        '''
     else:
         return "Authorization failed. No access token received.", 400
 
 # Grabbing data from specific activities to start
+@app.route("/activities")
+def activities():
+    # Get the access token from session
+    access_token = session.get('access_token')
+    if not access_token:
+        return redirect('/authorize')
 
+    # Headers to send for your request
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    # Get the most recent 5 activities
+    activities_response = requests.get("https://www.strava.com/api/v3/athlete/activities",
+                                       headers=headers,
+                                       params={"per_page":10},
+                                       verify=False)
+
+    if activities_response.status_code != 200:
+        return "Failed to fetch activities from Strava.", 500
+
+    # Filter to the activities that are bike rides
+    data = activities_response.json()
+    html = "<h1>Your Recent Cycling Activities</h1><ul>"
+    count = 0
+    for activity in data:
+        if activity.get("type") == 'Ride':
+            name = activity.get("name")
+            distance_km = activity.get("distance", 0)/1000
+            html += f"<li>{name} - {distance_km:.2f} km </li>"
+            count += 1
+            if count >= 5:
+                break
+    html += "</ul>"
+
+    if count == 0:
+        html = "<h1>No recent cycling activities found.</h1>"
+
+    return html
+
+# Generate Power Curve from last 5 rides
+@app.route("/powercurve")
+def powercurve():
+    # Get the access token from session and if not reauthorize
+    access_token = session.get('access_token')
+    if not access_token:
+        return redirect('/authorize')
+    
+    headers = {"Authorization": f"Bearer {access_token}"}
+    # Get last 10 activities and filter to the last 5 rides, return 500 if error
+    activities_response = requests.get("https://www.strava.com/api/v3/athlete/activities",
+                                       headers=headers,
+                                       params={"per_page":20, "page":1},
+                                       verify=False)
+    if activities_response.status_code != 200:
+        return "Failed to fetch activities from Strava.", 500
+
+        
+    # Set up duractions for PowerCurve
+    durations = [5, 10, 20, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 3600]  # in seconds
+    powercurve = {duration: 0 for duration in durations}
+
+    
+    # Get the power stream and get a rolling average. 
+    rides_with_power = []
+    for ride in activities_response.json():
+        # Skip if activity isn't a ride and doesn't have power data
+        if ride.get("type") != 'Ride':
+            continue
+        
+        # Send an API request to get the power stream from the ride ID
+        ride_id = ride['id']
+        stream_response = requests.get(f'https://www.strava.com/api/v3/activities/{ride_id}/streams',
+                                       headers=headers,
+                                       params={"keys":"watts", "key_by_type":True},
+                                       verify=False)
+        if stream_response.status_code != 200:
+            continue # Skip if unable to fetch power data
+        
+        # Parse the JSON and save power data
+        stream_data = stream_response.json()
+        watts_data = stream_data.get('watts')
+        watts_array = watts_data.get('data') if watts_data else None
+        if not isinstance(watts_array, list) or not watts_array:
+            continue
+        rides_with_power.append((ride_id, watts_array))
+        # Only take most recent 5 rides with power data
+        if len(rides_with_power) >= 5:
+            break
+
+    # Indicate if no rides with power data found        
+    if not rides_with_power:
+        return "<h1>No rides with power data found.</h1>", 500
+    
+    # Go through each ride with power and create the power curve
+    for ride_id, watts in rides_with_power:
+        print('Ride ID: ', ride_id)
+        for duration in durations:
+            print('Duraction: ', duration)
+            print(watts)
+            if len(watts) >= duration:
+            # Calculate rolling average for the duration
+                cumulative_sum = np.cumsum(watts, dtype=float)
+                cumulative_sum[duration:] = cumulative_sum[duration:] - cumulative_sum[:-duration]
+                rolling_avg = max(cumulative_sum[duration - 1:] / duration)
+                powercurve[duration] = max(powercurve[duration], rolling_avg)
+
+    # Formatting the output
+    html = "<h1>Your Power Curve (Max Average Power for Durations)</h1><ul>"
+    for duration in durations:
+        html += f'<li>{duration} sec: {powercurve[duration]:.2f} watts</li>'
+    html += "</ul>"
+    return html
 
 if __name__ == "__main__":
     app.run(debug=True, port=5050)
