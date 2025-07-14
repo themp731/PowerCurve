@@ -8,13 +8,25 @@ import requests
 import matplotlib.pyplot as plt
 import io
 import base64
+# SQLAlchemy for database handling
+from models import db, User, PowerCurve
 
 # load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Secret key for session management
+# Configure SQLAlchemy to link to Flask
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///powercurve.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db.init_app(app)
 
+# Create the database tables if they don't exist
+if not os.path.exists('powercurve.db'):
+    with app.app_context():
+        db.create_all()
+
+        
 # Get Credentials from environment variables
 STRAVA_CLIENT_ID = os.getenv('STRAVA_CLIENT_ID')
 STRAVA_CLIENT_SECRET = os.getenv('STRAVA_CLIENT_SECRET')
