@@ -1,0 +1,12 @@
+# Python Environment
+venv/
+
+# Variables for Creds
+.env
+
+# VS Code settings (optional)
+.vscode/
+
+# OS-specific
+.DS_Store
+Thumbs.db
