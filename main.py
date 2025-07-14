@@ -48,7 +48,8 @@ def callback():
         'client_id': STRAVA_CLIENT_ID,
         'client_secret': STRAVA_CLIENT_SECRET,
         'code': code,
-        'grant_type': 'authorization_code'})
+        'grant_type': 'authorization_code'},
+        verify=False) # DISABLES TESTING WILL NEED TO BE REMOVED FOR PRODUCTION)
     
     token_json = token_response.json()
     access_token = token_json.get('access_token')
