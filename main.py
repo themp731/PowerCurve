@@ -5,6 +5,9 @@ import os
 import numpy as np
 from dotenv import load_dotenv
 import requests
+import matplotlib.pyplot as plt
+import io
+import base64
 
 # load environment variables from .env file
 load_dotenv()
@@ -16,6 +19,9 @@ app.secret_key = os.urandom(24)  # Secret key for session management
 STRAVA_CLIENT_ID = os.getenv('STRAVA_CLIENT_ID')
 STRAVA_CLIENT_SECRET = os.getenv('STRAVA_CLIENT_SECRET')
 STRAVA_REDIRECT_URI = os.getenv('STRAVA_REDIRECT_URI')
+
+# Saving PowerCurves in memory for now
+user_powercurves = {}
 
 # Starts the OATH2.0 flow with Strava
 @app.route("/")
@@ -56,6 +62,17 @@ def callback():
 
     if access_token:
         session['access_token'] = access_token
+        # Get athlete ID
+        athlete_response = requests.get("https://www.strava.com/api/v3/athlete",
+                                        headers={"Authorization": f"Bearer {access_token}"},
+                                        verify=False)
+        # If we get a good response, save the athlete ID in session
+        if athlete_response.status_code == 200:
+            athlete_id = athlete_response.json().get('id')
+            session['athlete_id'] = athlete_id
+        else:
+            return "Failed to fetch athlete information.", 500
+        
         # If you get a good token, let the user know and give options for next steps
         return '''
             <h1>Authorization successful!</h1>
@@ -64,6 +81,7 @@ def callback():
         '''
     else:
         return "Authorization failed. No access token received.", 400
+
 
 # Grabbing data from specific activities to start
 @app.route("/activities")
@@ -160,10 +178,7 @@ def powercurve():
     
     # Go through each ride with power and create the power curve
     for ride_id, watts in rides_with_power:
-        print('Ride ID: ', ride_id)
         for duration in durations:
-            print('Duraction: ', duration)
-            print(watts)
             if len(watts) >= duration:
             # Calculate rolling average for the duration
                 cumulative_sum = np.cumsum(watts, dtype=float)
@@ -176,6 +191,29 @@ def powercurve():
     for duration in durations:
         html += f'<li>{duration} sec: {powercurve[duration]:.2f} watts</li>'
     html += "</ul>"
+    
+    # Save the powercurve in memory for the user
+    athlete_id = session.get('athlete_id')
+    if athlete_id:
+        user_powercurves[athlete_id] = powercurve
+
+    # Create a Power Curve plot
+    fig, ax = plt.subplots()
+    ax.plot(list(powercurve.keys()), list(powercurve.values()), marker='o')
+    ax.set_xlabel('Duration (seconds)')
+    ax.set_ylabel('Power (watts)')
+    ax.set_title('Power Curve')
+
+    # Convert the plot to a base64 image
+    # This is because flask doesn't know how to save an image as a file
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8') # Read the PNG bytes and encode as base64
+    plt.close(fig)
+    html += f'<img src="data:image/png;base64,{img_base64}"/>'
+    
+    # Display HTML in the site
     return html
 
 if __name__ == "__main__":
