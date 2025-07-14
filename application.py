@@ -3,17 +3,18 @@
 from flask import Flask, redirect, request, session
 import os
 import numpy as np
-from dotenv import load_dotenv
 import requests
 import matplotlib.pyplot as plt
 import io
 import base64
 
 # load environment variables from .env file
-load_dotenv()
+if os.environ.get("FLASK_ENV") != "production":
+    from dotenv import load_dotenv
+    load_dotenv()
 
-app = Flask(__name__)
-app.secret_key = os.urandom(24)  # Secret key for session management
+application = Flask(__name__)
+application.secret_key = os.urandom(24)  # Secret key for session management
 
 # Get Credentials from environment variables
 STRAVA_CLIENT_ID = os.getenv('STRAVA_CLIENT_ID')
@@ -24,7 +25,7 @@ STRAVA_REDIRECT_URI = os.getenv('STRAVA_REDIRECT_URI')
 user_powercurves = {}
 
 # Starts the OATH2.0 flow with Strava
-@app.route("/")
+@application.route("/")
 def home():
     return '''
         <h1>Welcome to the Strava Data App</h1>
@@ -32,7 +33,7 @@ def home():
         '''
 
 # Authorizing the Application to work with your strava
-@app.route("/authorize")
+@application.route("/authorize")
 def authorize():
     auth_url = (
         f"https://www.strava.com/oauth/authorize"
@@ -45,7 +46,7 @@ def authorize():
     return redirect(auth_url)
 
 # Sends you to the callback page and lets go to the next step
-@app.route("/strava/callback")
+@application.route("/strava/callback")
 def callback():
     code = request.args.get('code')
     if not code:
@@ -84,7 +85,7 @@ def callback():
 
 
 # Grabbing data from specific activities to start
-@app.route("/activities")
+@application.route("/activities")
 def activities():
     # Get the access token from session
     access_token = session.get('access_token')
@@ -123,7 +124,7 @@ def activities():
     return html
 
 # Generate Power Curve from last 5 rides
-@app.route("/powercurve")
+@application.route("/powercurve")
 def powercurve():
     # Get the access token from session and if not reauthorize
     access_token = session.get('access_token')
@@ -217,4 +218,4 @@ def powercurve():
     return html
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5050)
+    application.run(debug=True, port=5050)
