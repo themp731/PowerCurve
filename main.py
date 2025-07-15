@@ -82,6 +82,17 @@ def callback():
         if athlete_response.status_code == 200:
             athlete_id = athlete_response.json().get('id')
             session['athlete_id'] = athlete_id
+        
+            # Save user in database if not already present 
+            # Takes the user table/cass from models.py and does a filter query
+            user = User.query.filter_by(strava_id=str(athlete_id)).first()
+            # If not found, added it
+            if not user:
+                user = User(strava_id=str(athlete_id), access_token=access_token)
+                db.session.add(user)
+            else:
+                user.access_token = access_token # Update access token if changed
+            db.session.commit()
         else:
             return "Failed to fetch athlete information.", 500
         
@@ -196,20 +207,25 @@ def powercurve():
                 cumulative_sum = np.cumsum(watts, dtype=float)
                 cumulative_sum[duration:] = cumulative_sum[duration:] - cumulative_sum[:-duration]
                 rolling_avg = max(cumulative_sum[duration - 1:] / duration)
-                powercurve[duration] = max(powercurve[duration], rolling_avg)
+                powercurve[duration] = round(max(powercurve[duration], rolling_avg),2)
 
-    # Formatting the output
-    html = "<h1>Your Power Curve (Max Average Power for Durations)</h1><ul>"
-    for duration in durations:
-        html += f'<li>{duration} sec: {powercurve[duration]:.2f} watts</li>'
-    html += "</ul>"
-    
-    # Save the powercurve in memory for the user
-    athlete_id = session.get('athlete_id')
-    if athlete_id:
-        user_powercurves[athlete_id] = powercurve
 
-    # Create a Power Curve plot
+    # Save PowerCurve to database
+    athlete_id = session.get('athlete_id') # Get athlete ID from session
+    user = User.query.filter_by(strava_id=str(athlete_id)).first()
+    if user: # Delete old powercurve entries for user
+        PowerCurve.query.filter_by(user_id=user.id).delete()
+        new_power_curve = PowerCurve(
+            user_id=user.id,
+            activity_id=str(rides_with_power[0][0]), # Use the first ride's ID as a reference
+            curve=powercurve, # Save the generated power curve as JSON
+        )
+        db.session.add(new_power_curve)
+        db.session.commit()
+    else: # Handle case where user is not found
+        return "<h1>User not found. Please authorize the application first.</h1>", 400
+
+    # Create a Power Curve plot 
     fig, ax = plt.subplots()
     ax.plot(list(powercurve.keys()), list(powercurve.values()), marker='o')
     ax.set_xlabel('Duration (seconds)')

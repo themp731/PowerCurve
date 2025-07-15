@@ -15,5 +15,5 @@ class PowerCurve(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     activity_id = db.Column(db.String(50), nullable=False)
-    power = db.Column(db.Float, nullable=False)  
+    curve = db.Column(db.JSON, nullable=False)  
     created_at = db.Column(db.DateTime, server_default=db.func.now())
