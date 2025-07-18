@@ -10,6 +10,7 @@ import io
 import base64
 # SQLAlchemy for database handling
 from models import db, User, PowerCurve
+from utils.dummy_data import create_dummy_data
 
 # load environment variables from .env file
 load_dotenv()
@@ -26,6 +27,10 @@ if not os.path.exists('powercurve.db'):
     with app.app_context():
         db.create_all()
 
+# Add dummy data if now information
+with app.app_context():
+    if PowerCurve.query.count() <= 2:
+        create_dummy_data(app)
         
 # Get Credentials from environment variables
 STRAVA_CLIENT_ID = os.getenv('STRAVA_CLIENT_ID')
@@ -254,9 +259,9 @@ def powercurve():
     # Display HTML in the site
     return html
 
-@app.route("/compare")
+# Route to compare power curves between users
+@app.route("/compare", methods=["GET", "POST"])
 def compare():
-    
     # Take the current session ID and query the DB for the user
     current_user_id = session.get('athlete_id')
     current_user = User.query.filter_by(strava_id=str(current_user_id)).first()
@@ -264,5 +269,86 @@ def compare():
         html = "<h1>No user found. Please authorize first.</h1>"
         return html, 404
     
+    # Get the list of users with at least one curve except current user
+    users_with_curves = (
+        db.session.query(User)
+        .join(PowerCurve, User.id == PowerCurve.user_id)
+        .filter(User.id != current_user.id)
+        .distinct()
+        .all()
+    )
+
+    # Now compare the different users with the different curves.
+    other_user_id = request.form.get("compare_user")
+    other_curve = None
+    other_user_name = None
+    if other_user_id:
+        other_user = User.query.filter_by(id=int(other_user_id)).first()
+        if other_user:
+            # Get the latest power curve for the selected user
+            other_power_curve = (
+                PowerCurve.query.filter_by(user_id=other_user.id)
+                .order_by(PowerCurve.created_at.desc())
+                .first()
+            )
+            if other_power_curve:
+                other_curve = other_power_curve.curve
+                other_user_name = other_user.user_name 
+
+    # Get the current user's curve
+    current_user_curve = (
+        PowerCurve.query.filter_by(user_id=current_user.id)
+        .order_by(PowerCurve.created_at.desc())
+        .first()
+    )
+    if not current_user_curve:
+        html = "<h1>No power curve found for the current user. Please generate one first.</h1>"
+        return html, 404
+    
+
+    # Extract the data from the JSON
+    current_curve = current_user_curve.curve
+    current_x = sorted([int(k) for k in current_curve.keys()])
+    current_y = [current_curve[str(k)] for k in current_x]
+    
+    # Plot the curves
+    other_x = other_y = []
+    if other_curve:
+        other_x = sorted([int(k) for k in other_curve.keys()])
+        other_y = [other_curve[str(k)] for k in other_x]
+
+    # Making the plot window
+    fig, ax = plt.subplots()
+    ax.plot(current_x, current_y, marker='o', label=f"{current_user.user_name}'s Curve", color='blue')
+    if other_curve:
+        ax.plot(other_x, other_y, marker='o', label=f"{other_user_name}'s Curve", color='orange')
+    ax.set_xlabel('Duration (seconds)')
+    ax.set_ylabel('Power (watts)')
+    ax.set_title('Power Curve Comparison')
+    ax.legend()
+
+    # Handle the buffering
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')   # Read the PNG bytes and encode as base64
+    plt.close(fig)
+
+    # Make the dropdown for the HMTL
+    dropdown_html = '<form method="POST"><select name="compare_user">'
+    dropdown_html += '<option value="">Select a user to compare</option>'
+    for user in users_with_curves:
+        selected = 'selected' if other_user_id and str(user.id) == other_user_id else ''
+        dropdown_html += f'<option value="{user.id}" {selected}>{user.user_name}</option>'  
+    dropdown_html += '</select><input type="submit" value="Compare"></form>'
+
+    html = "<h1>Compare Power Curves</h1>"
+    html += dropdown_html
+    html += f'<img src="data:image/png;base64,{img_base64}"/>'
+
+    return html
+
+
+
 if __name__ == "__main__":
     app.run(debug=True, port=5050)
