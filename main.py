@@ -46,7 +46,7 @@ def home():
     return '''
         <h1>Welcome to the Strava Data App</h1>
         <p><a href="/authorize">Click here to authorize with Strava</a></p>
-        html += '<a href="/powercurve">Generate My Power Curve</a><br>'
+        <a href="/powercurve">Generate My Power Curve</a><br>
         '''
 
 # Authorizing the Application to work with your strava
@@ -176,7 +176,7 @@ def powercurve():
         return "Failed to fetch activities from Strava.", 500
 
         
-    # Set up duractions for PowerCurve
+    # Set up durations for PowerCurve
     durations = [5, 10, 20, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 3600]  # in seconds
     powercurve = {duration: 0 for duration in durations}
 
