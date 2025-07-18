@@ -25,15 +25,16 @@ def create_dummy_data(app):
                 db.session.add(user)
                 db.session.commit()
                 print(f"Added user {user.user_name} with Strava ID {user.strava_id}")
-
-        # Create a Power Curve for each user
-        curve = {str(t): round(uniform(100, 400), 2) for t in range(1, 3601)}
-        power_curve = PowerCurve(
-            user_id=user.id,
-            user_name=user.user_name,
-            activity_id=f"dummy_activity_{randint(1, 10000)}",
-            curve=curve
-        )
-        db.session.add(power_curve)
+        
+            # Create a Power Curve for each user
+            curve = {str(t): round(uniform(100, 400), 2) for t in range(1, 3601)}
+            power_curve = PowerCurve(
+                user_id=user.id,
+                user_name=user.user_name,
+                activity_id=f"dummy_activity_{randint(1, 10000)}",
+                curve=curve
+            )
+            db.session.add(power_curve)
+            print(f"Added PowerCurve for user {user.user_name}")
     db.session.commit()
-    print("Dummy PowerCurve data added for users.")
+    

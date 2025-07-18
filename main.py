@@ -46,6 +46,7 @@ def home():
     return '''
         <h1>Welcome to the Strava Data App</h1>
         <p><a href="/authorize">Click here to authorize with Strava</a></p>
+        html += '<a href="/powercurve">Generate My Power Curve</a><br>'
         '''
 
 # Authorizing the Application to work with your strava
