@@ -80,15 +80,19 @@ def callback():
                                         verify=False)
         # If we get a good response, save the athlete ID in session
         if athlete_response.status_code == 200:
-            athlete_id = athlete_response.json().get('id')
+            # Save the response data as a JSON string and extract each item
+            athlete_json = athlete_response.json()
+            athlete_id = athlete_json.get('id')
             session['athlete_id'] = athlete_id
-        
+            user_name = f"{athlete_json.get('firstname','')} {athlete_json.get('lastname','')}".strip()     
+            
             # Save user in database if not already present 
             # Takes the user table/cass from models.py and does a filter query
             user = User.query.filter_by(strava_id=str(athlete_id)).first()
             # If not found, added it
             if not user:
-                user = User(strava_id=str(athlete_id), access_token=access_token)
+                user = User(strava_id=str(athlete_id), access_token=access_token, 
+                            user_name=user_name)
                 db.session.add(user)
             else:
                 user.access_token = access_token # Update access token if changed
@@ -148,6 +152,9 @@ def activities():
 # Generate Power Curve from last 5 rides
 @app.route("/powercurve")
 def powercurve():
+    # Creating the HTML return text
+    html = "<h1>You Power Curve From Your Last 5 Rides</h1>"
+    
     # Get the access token from session and if not reauthorize
     access_token = session.get('access_token')
     if not access_token:
@@ -213,12 +220,15 @@ def powercurve():
     # Save PowerCurve to database
     athlete_id = session.get('athlete_id') # Get athlete ID from session
     user = User.query.filter_by(strava_id=str(athlete_id)).first()
+    # Look up the user name based on athlete ID to save into PowerCurve DB
+    user_name = user.user_name if user else "Unknown"
     if user: # Delete old powercurve entries for user
         PowerCurve.query.filter_by(user_id=user.id).delete()
         new_power_curve = PowerCurve(
             user_id=user.id,
             activity_id=str(rides_with_power[0][0]), # Use the first ride's ID as a reference
             curve=powercurve, # Save the generated power curve as JSON
+            user_name=user_name
         )
         db.session.add(new_power_curve)
         db.session.commit()
@@ -244,5 +254,15 @@ def powercurve():
     # Display HTML in the site
     return html
 
+@app.route("/compare")
+def compare():
+    
+    # Take the current session ID and query the DB for the user
+    current_user_id = session.get('athlete_id')
+    current_user = User.query.filter_by(strava_id=str(current_user_id)).first()
+    if not current_user:
+        html = "<h1>No user found. Please authorize first.</h1>"
+        return html, 404
+    
 if __name__ == "__main__":
     app.run(debug=True, port=5050)
