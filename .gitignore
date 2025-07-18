@@ -1,11 +1,21 @@
 # Python Environment
 venv/
+__pycache__/
+*.pyc
 
 # Variables for Creds
 .env
 
 # VS Code settings (optional)
 .vscode/
+.idea/
+
+# Flask instance folder
+instance/
+
+# DB Files
+*.sqlite3
+*.db
 
 # OS-specific
 .DS_Store
