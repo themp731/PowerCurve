@@ -25,6 +25,7 @@ class User(db.Model):
 class PowerCurve(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    username = db.Column(db.String(80), nullable=False)
     strava_name = db.Column(db.String(100))
     activity_id = db.Column(db.String(50), nullable=False)
     curve = db.Column(db.JSON, nullable=False)  
