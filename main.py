@@ -1,6 +1,7 @@
 # Entry Point for the flask application
 
 from flask import Flask, redirect, request, session
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import os
 import numpy as np
 from dotenv import load_dotenv
@@ -15,12 +16,35 @@ from utils.dummy_data import create_dummy_data
 # load environment variables from .env file
 load_dotenv()
 
+
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Secret key for session management
 # Configure SQLAlchemy to link to Flask
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///powercurve.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
+
+# --- Automatic DB schema check and rebuild ---
+# NOTE: This code is commented out due to a looping error. Needs fixing later.
+# def check_and_rebuild_db():
+#     from sqlalchemy.exc import OperationalError
+#     import sys
+#     try:
+#         with app.app_context():
+#             from sqlalchemy import text
+#             # Check user table columns
+#             db.session.execute(text("SELECT id, username, password_hash, strava_id, access_token, username FROM user LIMIT 1"))
+#             # Check power_curve table columns
+#             db.session.execute(text("SELECT id, user_id, username, activity_id, curve, created_at FROM power_curve LIMIT 1"))
+#     except OperationalError:
+#         print("Database schema mismatch detected. Rebuilding database...")
+#         # We use subprocess here because rebuilding the database (deleting and recreating the file)
+#         # while the Flask app is running can cause issues with open connections and cached models.
+#         # Running the rebuild as a separate process ensures a clean rebuild and avoids side effects.
+#         import subprocess
+#         subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), 'utils', 'rebuild_db.py')])
+#         print("Database rebuild complete.")
+# check_and_rebuild_db()
 
 # Create the database tables if they don't exist
 if not os.path.exists('powercurve.db'):
@@ -37,12 +61,71 @@ STRAVA_CLIENT_ID = os.getenv('STRAVA_CLIENT_ID')
 STRAVA_CLIENT_SECRET = os.getenv('STRAVA_CLIENT_SECRET')
 STRAVA_REDIRECT_URI = os.getenv('STRAVA_REDIRECT_URI')
 
-# Saving PowerCurves in memory for now
-user_powercurves = {}
+# Initialize the flask login management
+login_manager = LoginManager()
+login_manager.login_view = 'login'
+login_manager.init_app(app)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id)) 
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        if User.query.filter_by(username=username).first():
+            return "Username already exists."
+        user = User(username=username)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        login_user(user)
+        return redirect("/home")
+    return '''
+        <form method="post">
+            Username: <input type="text" name="username"/><br>
+            Password: <input type="password" name="password"/><br>
+            <input type="submit" value="Sign Up"/>
+        </form>
+    '''
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        user = User.query.filter_by(username=request.form["username"]).first()
+        if user and user.check_password(request.form["password"]):
+            login_user(user)
+            return redirect("/home")
+        return "Invalid username or password."
+    return '''
+        <form method="post">
+            Username: <input type="text" name="username"/><br>
+            Password: <input type="password" name="password"/><br>
+            <input type="submit" value="Login"/>
+        </form>
+    '''
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect("/")
+
+@app.route("/home")
+@login_required
+def home():
+    return f"""
+        <h1>Welcome, {current_user.username}</h1>
+        <p><a href="/authorize">Update your Strava PowerCurve</a></p>
+        <p><a href="/compare">Compare PowerCurves</a></p>
+        <p><a href="/logout">Logout</a></p>
+    """
 
 # Starts the OATH2.0 flow with Strava
 @app.route("/")
-def home():
+def homepage():
     return '''
         <h1>Welcome to the Strava Data App</h1>
         <p><a href="/authorize">Click here to authorize with Strava</a></p>
@@ -90,7 +173,7 @@ def callback():
             athlete_json = athlete_response.json()
             athlete_id = athlete_json.get('id')
             session['athlete_id'] = athlete_id
-            user_name = f"{athlete_json.get('firstname','')} {athlete_json.get('lastname','')}".strip()     
+            username = f"{athlete_json.get('firstname','')} {athlete_json.get('lastname','')}".strip()     
             
             # Save user in database if not already present 
             # Takes the user table/cass from models.py and does a filter query
@@ -98,7 +181,7 @@ def callback():
             # If not found, added it
             if not user:
                 user = User(strava_id=str(athlete_id), access_token=access_token, 
-                            user_name=user_name)
+                            username=username)
                 db.session.add(user)
             else:
                 user.access_token = access_token # Update access token if changed
@@ -227,14 +310,14 @@ def powercurve():
     athlete_id = session.get('athlete_id') # Get athlete ID from session
     user = User.query.filter_by(strava_id=str(athlete_id)).first()
     # Look up the user name based on athlete ID to save into PowerCurve DB
-    user_name = user.user_name if user else "Unknown"
+    username = user.username if user else "Unknown"
     if user: # Delete old powercurve entries for user
         PowerCurve.query.filter_by(user_id=user.id).delete()
         new_power_curve = PowerCurve(
             user_id=user.id,
             activity_id=str(rides_with_power[0][0]), # Use the first ride's ID as a reference
             curve=powercurve, # Save the generated power curve as JSON
-            user_name=user_name
+            username=username
         )
         db.session.add(new_power_curve)
         db.session.commit()
@@ -282,7 +365,7 @@ def compare():
     # Now compare the different users with the different curves.
     other_user_id = request.form.get("compare_user")
     other_curve = None
-    other_user_name = None
+    other_username = None
     if other_user_id:
         other_user = User.query.filter_by(id=int(other_user_id)).first()
         if other_user:
@@ -294,7 +377,7 @@ def compare():
             )
             if other_power_curve:
                 other_curve = other_power_curve.curve
-                other_user_name = other_user.user_name 
+                other_username = other_user.username 
 
     # Get the current user's curve
     current_user_curve = (
@@ -320,9 +403,9 @@ def compare():
 
     # Making the plot window
     fig, ax = plt.subplots()
-    ax.plot(current_x, current_y, marker='o', label=f"{current_user.user_name}'s Curve", color='blue')
+    ax.plot(current_x, current_y, marker='o', label=f"{current_user.username}'s Curve", color='blue')
     if other_curve:
-        ax.plot(other_x, other_y, marker='o', label=f"{other_user_name}'s Curve", color='orange')
+        ax.plot(other_x, other_y, marker='o', label=f"{other_username}'s Curve", color='orange')
     ax.set_xlabel('Duration (seconds)')
     ax.set_ylabel('Power (watts)')
     ax.set_title('Power Curve Comparison')
@@ -340,7 +423,7 @@ def compare():
     dropdown_html += '<option value="">Select a user to compare</option>'
     for user in users_with_curves:
         selected = 'selected' if other_user_id and str(user.id) == other_user_id else ''
-        dropdown_html += f'<option value="{user.id}" {selected}>{user.user_name}</option>'  
+        dropdown_html += f'<option value="{user.id}" {selected}>{user.username}</option>'  
     dropdown_html += '</select><input type="submit" value="Compare"></form>'
 
     html = "<h1>Compare Power Curves</h1>"
