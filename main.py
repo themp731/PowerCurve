@@ -24,6 +24,25 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///powercurve.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
+# --- Automatic DB schema check and rebuild ---
+def check_and_rebuild_db():
+    from sqlalchemy.exc import OperationalError
+    import sys
+    try:
+        with app.app_context():
+            # Try a simple query to check schema
+            db.session.execute('SELECT * FROM user LIMIT 1')
+    except OperationalError as e:
+        print("Database schema mismatch detected. Rebuilding database...")
+        # We use subprocess here because rebuilding the database (deleting and recreating the file)
+        # while the Flask app is running can cause issues with open connections and cached models.
+        # Running the rebuild as a separate process ensures a clean rebuild and avoids side effects.
+        import subprocess
+        subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), 'utils', 'rebuild_db.py')])
+        print("Database rebuild complete.")
+
+check_and_rebuild_db()
+
 # Create the database tables if they don't exist
 if not os.path.exists('powercurve.db'):
     with app.app_context():
