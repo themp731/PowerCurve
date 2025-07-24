@@ -1,6 +1,7 @@
 # Entry Point for the flask application
 
 from flask import Flask, redirect, request, session
+from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import os
 import numpy as np
 from dotenv import load_dotenv
@@ -14,6 +15,7 @@ from utils.dummy_data import create_dummy_data
 
 # load environment variables from .env file
 load_dotenv()
+
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Secret key for session management
@@ -37,8 +39,67 @@ STRAVA_CLIENT_ID = os.getenv('STRAVA_CLIENT_ID')
 STRAVA_CLIENT_SECRET = os.getenv('STRAVA_CLIENT_SECRET')
 STRAVA_REDIRECT_URI = os.getenv('STRAVA_REDIRECT_URI')
 
-# Saving PowerCurves in memory for now
-user_powercurves = {}
+# Initialize the flask login management
+login_manager = LoginManager()
+login_manager.login_view = 'login'
+login_manager.init_app(app)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id)) 
+
+@app.route("/signup", methods=["GET", "POST"])
+def signup():
+    if request.method == "POST":
+        username = request.form["username"]
+        password = request.form["password"]
+        if User.query.filter_by(username=username).first():
+            return "Username already exists."
+        user = User(username=username)
+        user.set_password(password)
+        db.session.add(user)
+        db.session.commit()
+        login_user(user)
+        return redirect("/home")
+    return '''
+        <form method="post">
+            Username: <input type="text" name="username"/><br>
+            Password: <input type="password" name="password"/><br>
+            <input type="submit" value="Sign Up"/>
+        </form>
+    '''
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        user = User.query.filter_by(username=request.form["username"]).first()
+        if user and user.check_password(request.form["password"]):
+            login_user(user)
+            return redirect("/home")
+        return "Invalid username or password."
+    return '''
+        <form method="post">
+            Username: <input type="text" name="username"/><br>
+            Password: <input type="password" name="password"/><br>
+            <input type="submit" value="Login"/>
+        </form>
+    '''
+
+@app.route("/logout")
+@login_required
+def logout():
+    logout_user()
+    return redirect("/")
+
+@app.route("/home")
+@login_required
+def home():
+    return f"""
+        <h1>Welcome, {current_user.username}</h1>
+        <p><a href="/authorize">Update your Strava PowerCurve</a></p>
+        <p><a href="/compare">Compare PowerCurves</a></p>
+        <p><a href="/logout">Logout</a></p>
+    """
 
 # Starts the OATH2.0 flow with Strava
 @app.route("/")
