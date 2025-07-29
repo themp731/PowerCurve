@@ -12,6 +12,7 @@ import base64
 # SQLAlchemy for database handling
 from models import db, User, PowerCurve
 from utils.dummy_data import create_dummy_data
+from utils.pretty_print import pretty_print
 
 # load environment variables from .env file
 load_dotenv()
@@ -79,12 +80,7 @@ def logout():
 @app.route("/home")
 @login_required
 def home():
-    return f"""
-        <h1>Welcome, {current_user.username}</h1>
-        <p><a href="/authorize">Update your Strava PowerCurve</a></p>
-        <p><a href="/compare">Compare PowerCurves</a></p>
-        <p><a href="/logout">Logout</a></p>
-    """
+    return render_template("home.html", user=current_user)
 
 # Brings up the main page and asks if you have an account. 
 @app.route("/")
@@ -122,10 +118,11 @@ def callback():
             "client_secret": STRAVA_CLIENT_SECRET,
             "code": code,
             "grant_type": "authorization_code",
-        },
+        }, verify=False # Added verify=False to avoid SSL issues during local testing
     )
     # Parse the response JSON to extract the access token and athlete info
     token_json = token_response.json()
+    pretty_print(token_json)  # Debug: print the full JSON response
     access_token = token_json["access_token"]
     athlete = token_json["athlete"]
     strava_id = str(athlete["id"])
@@ -144,6 +141,7 @@ def callback():
     db.session.commit()
     
     # Log the user in using Flask-Login
+    session['strava_id'] = strava_id  # <-- Changed from 'athlete_id' to 'strava_id'
     login_user(user)
     # Redirect to the home page after successful login
     return redirect("/home")
@@ -257,21 +255,21 @@ def powercurve():
 
 
     # Save PowerCurve to database
-    athlete_id = session.get('athlete_id') # Get athlete ID from session
-    user = User.query.filter_by(strava_id=str(athlete_id)).first()
+    strava_id = session.get('strava_id')  # <-- Changed from 'athlete_id'
+    user = User.query.filter_by(strava_id=str(strava_id)).first()
     # Look up the user name based on athlete ID to save into PowerCurve DB
-    username = user.username if user else "Unknown"
+    strava_id = user.strava_id if user else "Unknown"
     if user: # Delete old powercurve entries for user
         PowerCurve.query.filter_by(user_id=user.id).delete()
         new_power_curve = PowerCurve(
             user_id=user.id,
-            activity_id=str(rides_with_power[0][0]), # Use the first ride's ID as a reference
-            curve=powercurve, # Save the generated power curve as JSON
-            username=username
+            activity_id=str(rides_with_power[0][0]),
+            curve=powercurve,
+            strava_id=strava_id
         )
         db.session.add(new_power_curve)
         db.session.commit()
-    else: # Handle case where user is not found
+    else:
         return "<h1>User not found. Please authorize the application first.</h1>", 400
 
     # Create a Power Curve plot 
@@ -296,9 +294,8 @@ def powercurve():
 # Route to compare power curves between users
 @app.route("/compare", methods=["GET", "POST"])
 def compare():
-    # Take the current session ID and query the DB for the user
-    current_user_id = session.get('athlete_id')
-    current_user = User.query.filter_by(strava_id=str(current_user_id)).first()
+    strava_id = session.get('strava_id')  # <-- Changed from 'athlete_id'
+    current_user = User.query.filter_by(strava_id=str(strava_id)).first()
     if not current_user:
         html = "<h1>No user found. Please authorize first.</h1>"
         return html, 404
@@ -327,7 +324,7 @@ def compare():
             )
             if other_power_curve:
                 other_curve = other_power_curve.curve
-                other_username = other_user.username 
+                other_username = other_user.strava_id
 
     # Get the current user's curve
     current_user_curve = (
@@ -353,7 +350,7 @@ def compare():
 
     # Making the plot window
     fig, ax = plt.subplots()
-    ax.plot(current_x, current_y, marker='o', label=f"{current_user.username}'s Curve", color='blue')
+    ax.plot(current_x, current_y, marker='o', label=f"{current_user.strava_id}'s Curve", color='blue')
     if other_curve:
         ax.plot(other_x, other_y, marker='o', label=f"{other_username}'s Curve", color='orange')
     ax.set_xlabel('Duration (seconds)')
@@ -373,7 +370,7 @@ def compare():
     dropdown_html += '<option value="">Select a user to compare</option>'
     for user in users_with_curves:
         selected = 'selected' if other_user_id and str(user.id) == other_user_id else ''
-        dropdown_html += f'<option value="{user.id}" {selected}>{user.username}</option>'  
+        dropdown_html += f'<option value="{user.id}" {selected}>{user.strava_id}</option>'  
     dropdown_html += '</select><input type="submit" value="Compare"></form>'
 
     html = "<h1>Compare Power Curves</h1>"
