@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>PowerCurve</title>  <!-- The title shown in the browser tab -->
+</head>
+<body>
+    <nav>
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('home') }}">Home</a> |  <!-- Link to home if logged in -->
+            <a href="{{ url_for('logout') }}">Logout</a>  <!-- Logout link if logged in -->
+        {% else %}
+            <a href="{{ url_for('login') }}">Login</a> |  <!-- Login link if not logged in -->
+            <a href="{{ url_for('signup') }}">Sign Up</a>  <!-- Signup link if not logged in -->
+        {% endif %}
+    </nav>
+    <hr>
+    {% block content %}{% endblock %}  <!-- Placeholder for page-specific content -->
+</body>
+</html>

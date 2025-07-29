@@ -1,0 +1,30 @@
+{# 
+    Summary:
+    This page is a login form template for a web application. 
+    It displays a login form, shows an error message if login fails, 
+    and provides a link to the signup page. 
+    The template uses Jinja syntax to extend a base layout and render dynamic content.
+#}
+
+{% extends "base.html" %} {# Inherit layout and blocks from base.html using Jinja #}
+{% block content %}        {# Define the 'content' block to insert page-specific content #}
+
+<h2>Login</h2>
+
+{% if error %}            {# Jinja: If an error variable is set, display the error message #}
+<p style="color:red;">{{ error }}</p> {# Jinja: Output the error variable #}
+{% endif %}
+
+<form method="post">       {# Standard HTML form for user login #}
+    Username: <input type="text" name="username"><br>
+    Password: <input type="password" name="password"><br>
+    <input type="submit" value="Login">
+</form>
+
+<p>
+    Don't have an account? 
+    <a href="{{ url_for('signup') }}">Sign up here</a> 
+    {# Jinja: Use url_for to generate the signup page URL dynamically #}
+</p>
+
+{% endblock %}            {# End of the 'content' block #}
