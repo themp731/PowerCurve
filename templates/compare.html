@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Compare Power Curves</h1>
+<form method="POST">
+    <select name="compare_user">
+        <option value="">Select a user to compare</option>
+        {% for user in users_with_curves %}
+            <option value="{{ user.id }}" {% if other_user_id and user.id|string == other_user_id %}selected{% endif %}>
+                {{ user.strava_id }}
+            </option>
+        {% endfor %}
+    </select>
+    <input type="submit" value="Compare">
+</form>
+{% if img_base64 %}
+    <img src="data:image/png;base64,{{ img_base64 }}" alt="Power Curve Comparison"/>
+{% endif %}
+<form action="{{ url_for('home') }}">
+    <button type="submit">Go back to home</button>
+</form>
+{% endblock %}

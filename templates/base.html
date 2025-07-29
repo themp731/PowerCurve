@@ -4,19 +4,10 @@
     <title>PowerCurve</title>
 </head>
 <body>
-    <!-- Navigation bar -->
-    <nav>
-        {% if current_user.is_authenticated %}
-            <!-- If the user is logged in, show Home and Logout links -->
-            <a href="{{ url_for('home') }}">Home</a> |
-            <a href="{{ url_for('logout') }}">Logout</a>
-        {% else %}
-            <!-- If the user is not logged in, show the login link -->
-            <a href="{{ url_for('authorize') }}">Log in with Strava</a>
-        {% endif %}
-    </nav>
+    <header>
+        <h2>MP's Power Curve Comparison Tool</h2>
+    </header>
     <hr>
-    <!-- Content block to be overridden by child templates -->
     {% block content %}{% endblock %}
 </body>
 </html>

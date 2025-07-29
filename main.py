@@ -6,6 +6,8 @@ import os
 import numpy as np
 from dotenv import load_dotenv
 import requests
+import matplotlib
+matplotlib.use('Agg')  # Use 'Agg' backend for non-GUI environments
 import matplotlib.pyplot as plt
 import io
 import base64
@@ -64,7 +66,7 @@ STRAVA_REDIRECT_URI = os.getenv('STRAVA_REDIRECT_URI')
 
 # Initialize the flask login management
 login_manager = LoginManager()
-login_manager.login_view = 'login'
+login_manager.login_view = 'landing'  # Redirect to landing page if not logged in
 login_manager.init_app(app)
 
 @login_manager.user_loader
@@ -75,6 +77,7 @@ def load_user(user_id):
 @login_required
 def logout():
     logout_user()
+    session.clear()  # <-- This drops all session data
     return redirect("/")
 
 @app.route("/home")
@@ -124,6 +127,7 @@ def callback():
     token_json = token_response.json()
     pretty_print(token_json)  # Debug: print the full JSON response
     access_token = token_json["access_token"]
+    session['access_token'] = access_token  # Store access token in session for later use
     athlete = token_json["athlete"]
     strava_id = str(athlete["id"])
     strava_name = athlete.get("username", "")
@@ -188,6 +192,7 @@ def activities():
 
 # Generate Power Curve from last 5 rides
 @app.route("/powercurve")
+@login_required
 def powercurve():
     # Creating the HTML return text
     html = "<h1>You Power Curve From Your Last 5 Rides</h1>"
@@ -289,10 +294,14 @@ def powercurve():
     html += f'<img src="data:image/png;base64,{img_base64}"/>'
     
     # Display HTML in the site
-    return html
+    return render_template(
+        "powercurve.html",
+        img_base64=img_base64
+    )
 
 # Route to compare power curves between users
 @app.route("/compare", methods=["GET", "POST"])
+@login_required
 def compare():
     strava_id = session.get('strava_id')  # <-- Changed from 'athlete_id'
     current_user = User.query.filter_by(strava_id=str(strava_id)).first()
@@ -377,7 +386,12 @@ def compare():
     html += dropdown_html
     html += f'<img src="data:image/png;base64,{img_base64}"/>'
 
-    return html
+    return render_template(
+        "compare.html",
+        users_with_curves=users_with_curves,
+        img_base64=img_base64,
+        other_user_id=other_user_id
+    )
 
 
 
