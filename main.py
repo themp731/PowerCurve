@@ -108,77 +108,43 @@ def authorize():
     )
     return redirect(auth_url)
 
-# Callback route for Strava OAuth2 redirect
-@app.route("/callback")
+# Strava OAuth callback route
+@app.route("/strava/callback")
 def callback():
-    # Get the authorization code from the query parameters
+    # Get the authorization code returned by Strava after user approval
     code = request.args.get("code")
-    if not code:
-        # If no code is provided, return an error
-        return "Authorization code not provided by Strava.", 400
-
+    
     # Exchange the authorization code for an access token
-    try:
-        token_response = requests.post(
-            "https://www.strava.com/oauth/token",
-            data={
-                "client_id": STRAVA_CLIENT_ID,
-                "client_secret": STRAVA_CLIENT_SECRET,
-                "code": code,
-                "grant_type": "authorization_code",
-            },
-            timeout=10
-        )
-    except requests.RequestException as e:
-        # Handle network errors
-        return f"Failed to connect to Strava: {e}", 500
-
-    if token_response.status_code != 200:
-        # If Strava returns an error, show the error message
-        return f"Failed to get access token from Strava: {token_response.text}", 500
-
-    # Parse the JSON response
+    token_response = requests.post(
+        "https://www.strava.com/oauth/token",
+        data={
+            "client_id": STRAVA_CLIENT_ID,
+            "client_secret": STRAVA_CLIENT_SECRET,
+            "code": code,
+            "grant_type": "authorization_code",
+        },
+    )
+    # Parse the response JSON to extract the access token and athlete info
     token_json = token_response.json()
-    access_token = token_json.get("access_token")
-    athlete = token_json.get("athlete")
-
-    if not access_token or not athlete:
-        # If the response does not contain expected data, return error
-        return "Invalid response from Strava during authentication.", 500
-
-    # Extract Strava user information
-    strava_id = str(athlete.get("id"))
+    access_token = token_json["access_token"]
+    athlete = token_json["athlete"]
+    strava_id = str(athlete["id"])
     strava_name = athlete.get("username", "")
 
-    if not strava_id:
-        # If no athlete ID, cannot proceed
-        return "Strava athlete ID missing in response.", 500
-
-    # Log in or create user in the local database
+    # Look up the user in the database by Strava ID
     user = User.query.filter_by(strava_id=strava_id).first()
     if not user:
-        # Create a new user if not found
+        # If user does not exist, create a new user record
         user = User(strava_id=strava_id, access_token=access_token, strava_name=strava_name)
         db.session.add(user)
     else:
-        # Update existing user's access token and name
+        # If user exists, update their access token and Strava username
         user.access_token = access_token
         user.strava_name = strava_name
-
-    try:
-        db.session.commit()
-    except Exception as e:
-        # Handle database errors
-        db.session.rollback()
-        return f"Database error: {e}", 500
-
+    db.session.commit()
+    
     # Log the user in using Flask-Login
     login_user(user)
-
-    # Store access token and athlete ID in session for later use
-    session['access_token'] = access_token
-    session['athlete_id'] = strava_id
-
     # Redirect to the home page after successful login
     return redirect("/home")
 

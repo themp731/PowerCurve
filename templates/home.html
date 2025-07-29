@@ -1,7 +1,7 @@
 {% extends "base.html" %}  {# Inherit layout and navigation from base.html #}
 
 {% block content %}  {# Start of the content block for the home page #}
-<h1>Welcome, {{ current_user.username }}</h1>  {# Personalized greeting for the logged-in user #}
+<h1>Welcome, {{ current_user.strava_name or 'Strava User' }}</h1>  {# Personalized greeting for the logged-in user #}
 <p><a href="/authorize">Update your Strava PowerCurve</a></p>  {# Link to Strava authorization #}
 <p><a href="/compare">Compare PowerCurves</a></p>  {# Link to compare power curves #}
 <p><a href="/logout">Logout</a></p>  {# Link to log out #}
