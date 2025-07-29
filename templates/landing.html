@@ -1,8 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
-<h1>Welcome to PowerCurve</h1>
+<h1>Welcome to MP's PowerCurve Comparison Tool</h1>
 <p>
-    <a href="{{ url_for('login') }}">Log In</a> or
-    <a href="{{ url_for('signup') }}">Create an Account</a>
+    <a href="{{ url_for('authorize') }}">Log in with Strava</a>
 </p>
 {% endblock %}

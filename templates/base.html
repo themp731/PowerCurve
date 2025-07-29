@@ -1,19 +1,22 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>PowerCurve</title>  <!-- The title shown in the browser tab -->
+    <title>PowerCurve</title>
 </head>
 <body>
+    <!-- Navigation bar -->
     <nav>
         {% if current_user.is_authenticated %}
-            <a href="{{ url_for('home') }}">Home</a> |  <!-- Link to home if logged in -->
-            <a href="{{ url_for('logout') }}">Logout</a>  <!-- Logout link if logged in -->
+            <!-- If the user is logged in, show Home and Logout links -->
+            <a href="{{ url_for('home') }}">Home</a> |
+            <a href="{{ url_for('logout') }}">Logout</a>
         {% else %}
-            <a href="{{ url_for('login') }}">Login</a> |  <!-- Login link if not logged in -->
-            <a href="{{ url_for('signup') }}">Sign Up</a>  <!-- Signup link if not logged in -->
+            <!-- If the user is not logged in, show the login link -->
+            <a href="{{ url_for('authorize') }}">Log in with Strava</a>
         {% endif %}
     </nav>
     <hr>
-    {% block content %}{% endblock %}  <!-- Placeholder for page-specific content -->
+    <!-- Content block to be overridden by child templates -->
+    {% block content %}{% endblock %}
 </body>
 </html>
