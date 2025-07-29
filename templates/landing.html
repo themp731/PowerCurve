@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Welcome to PowerCurve</h1>
+<p>
+    <a href="{{ url_for('login') }}">Log In</a> or
+    <a href="{{ url_for('signup') }}">Create an Account</a>
+</p>
+{% endblock %}

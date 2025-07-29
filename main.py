@@ -1,6 +1,6 @@
 # Entry Point for the flask application
 
-from flask import Flask, redirect, request, session
+from flask import Flask, redirect, request, session, render_template
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import os
 import numpy as np
@@ -76,36 +76,33 @@ def signup():
         username = request.form["username"]
         password = request.form["password"]
         if User.query.filter_by(username=username).first():
-            return "Username already exists."
+            return render_template("signup.html", error="Username already exists.")
         user = User(username=username)
         user.set_password(password)
         db.session.add(user)
         db.session.commit()
         login_user(user)
         return redirect("/home")
-    return '''
-        <form method="post">
-            Username: <input type="text" name="username"/><br>
-            Password: <input type="password" name="password"/><br>
-            <input type="submit" value="Sign Up"/>
-        </form>
-    '''
-
+    else:
+        return render_template("signup.html", error=None)
+    
+# Route for user login (handles both GET and POST requests)
 @app.route("/login", methods=["GET", "POST"])
 def login():
+    # If the request is a POST (form submission)
     if request.method == "POST":
+        # Look up the user by username in the database
         user = User.query.filter_by(username=request.form["username"]).first()
+        # If user exists and password is correct
         if user and user.check_password(request.form["password"]):
+            # Log the user in (sets session)
             login_user(user)
+            # Redirect to the home page after successful login
             return redirect("/home")
-        return "Invalid username or password."
-    return '''
-        <form method="post">
-            Username: <input type="text" name="username"/><br>
-            Password: <input type="password" name="password"/><br>
-            <input type="submit" value="Login"/>
-        </form>
-    '''
+        # If login fails, show error message on login page
+        return render_template("login.html", error="Invalid username or password.")
+    # If GET request, just render the login page with no error
+    return render_template("login.html", error=None)
 
 @app.route("/logout")
 @login_required
@@ -123,14 +120,13 @@ def home():
         <p><a href="/logout">Logout</a></p>
     """
 
-# Starts the OATH2.0 flow with Strava
+# Brings up the main page and asks if you have an account. 
 @app.route("/")
-def homepage():
-    return '''
-        <h1>Welcome to the Strava Data App</h1>
-        <p><a href="/authorize">Click here to authorize with Strava</a></p>
-        <a href="/powercurve">Generate My Power Curve</a><br>
-        '''
+def landing():
+    # If user is logged in, redirect to /home. Otherwise, show landing page.
+    if current_user.is_authenticated:
+        return redirect("/home")
+    return render_template("landing.html")
 
 # Authorizing the Application to work with your strava
 @app.route("/authorize")
