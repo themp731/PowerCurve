@@ -12,9 +12,9 @@ def create_dummy_data(app):
     with app.app_context():
         # Creating 3 dummy users with user_name field (make sure User model supports user_name)
         dummy_users = [
-            {"strava_id": "1001", "access_token": "token1", "username": "Alice Example", "password_hash": "dummyhash"},
-            {"strava_id": "1002", "access_token": "token2", "username": "Bob Example", "password_hash": "dummyhash"},
-            {"strava_id": "1003", "access_token": "token3", "username": "Charlie Example", "password_hash": "dummyhash"},
+            {"strava_id": "1001", "access_token": "token1", "strava_name": "Alice Example"},
+            {"strava_id": "1002", "access_token": "token2", "strava_name": "Bob Example"},
+            {"strava_id": "1003", "access_token": "token3", "strava_name": "Charlie Example"},
         ]
 
     # Add the user info into the different curves
@@ -24,17 +24,17 @@ def create_dummy_data(app):
                 user = User(**user_info)
                 db.session.add(user)
                 db.session.commit()
-                print(f"Added user {user.username} with Strava ID {user.strava_id}")
+                print(f"Added user {user.strava_name} with Strava ID {user.strava_id}")
         
             # Create a Power Curve for each user
             curve = {str(t): round(uniform(100, 400), 2) for t in range(1, 3601)}
             power_curve = PowerCurve(
                 user_id=user.id,
-                username=user.username,
+                strava_id=user.strava_id,
                 activity_id=f"dummy_activity_{randint(1, 10000)}",
                 curve=curve
             )
             db.session.add(power_curve)
-            print(f"Added PowerCurve for user {user.username}")
+            print(f"Added PowerCurve for user {user.strava_name}")
     db.session.commit()
     

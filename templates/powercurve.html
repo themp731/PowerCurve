@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{# 
+    This template displays the power curve plot for the user's last 5 rides.
+    The plot image is generated in the backend (likely in a Flask view function).
+    The backend processes the user's last 5 rides, extracts power data, and computes the power curve.
+    The power curve is plotted using a library (e.g., matplotlib), saved to a buffer, and then encoded as a base64 string.
+    This base64 string is passed to the template as 'img_base64'.
+    If 'img_base64' is present, the image is rendered directly in the HTML using a data URI.
+    Otherwise, a message is shown indicating no data is available.
+#}
+{% block content %}
+<h1>Your Power Curve From Your Last 5 Rides</h1>
+{% if img_base64 %}
+    {# Display the power curve plot if available #}
+    <img src="data:image/png;base64,{{ img_base64 }}" alt="Power Curve Plot"/>
+{% else %}
+    {# Show a message if no power curve data is available #}
+    <p>No power curve data available.</p>
+{% endif %}
+<form action="{{ url_for('home') }}">
+    <button type="submit">Go back to home</button>
+</form>
+{% endblock %}

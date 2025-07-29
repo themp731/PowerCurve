@@ -1,17 +1,20 @@
 # Entry Point for the flask application
 
-from flask import Flask, redirect, request, session
+from flask import Flask, redirect, request, session, render_template
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import os
 import numpy as np
 from dotenv import load_dotenv
 import requests
+import matplotlib
+matplotlib.use('Agg')  # Use 'Agg' backend for non-GUI environments
 import matplotlib.pyplot as plt
 import io
 import base64
 # SQLAlchemy for database handling
 from models import db, User, PowerCurve
 from utils.dummy_data import create_dummy_data
+from utils.pretty_print import pretty_print
 
 # load environment variables from .env file
 load_dotenv()
@@ -63,78 +66,37 @@ STRAVA_REDIRECT_URI = os.getenv('STRAVA_REDIRECT_URI')
 
 # Initialize the flask login management
 login_manager = LoginManager()
-login_manager.login_view = 'login'
+login_manager.login_view = 'landing'  # Redirect to landing page if not logged in
 login_manager.init_app(app)
 
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id)) 
 
-@app.route("/signup", methods=["GET", "POST"])
-def signup():
-    if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
-        if User.query.filter_by(username=username).first():
-            return "Username already exists."
-        user = User(username=username)
-        user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
-        login_user(user)
-        return redirect("/home")
-    return '''
-        <form method="post">
-            Username: <input type="text" name="username"/><br>
-            Password: <input type="password" name="password"/><br>
-            <input type="submit" value="Sign Up"/>
-        </form>
-    '''
-
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    if request.method == "POST":
-        user = User.query.filter_by(username=request.form["username"]).first()
-        if user and user.check_password(request.form["password"]):
-            login_user(user)
-            return redirect("/home")
-        return "Invalid username or password."
-    return '''
-        <form method="post">
-            Username: <input type="text" name="username"/><br>
-            Password: <input type="password" name="password"/><br>
-            <input type="submit" value="Login"/>
-        </form>
-    '''
-
 @app.route("/logout")
 @login_required
 def logout():
     logout_user()
+    session.clear()  # <-- This drops all session data
     return redirect("/")
 
 @app.route("/home")
 @login_required
 def home():
-    return f"""
-        <h1>Welcome, {current_user.username}</h1>
-        <p><a href="/authorize">Update your Strava PowerCurve</a></p>
-        <p><a href="/compare">Compare PowerCurves</a></p>
-        <p><a href="/logout">Logout</a></p>
-    """
+    return render_template("home.html", user=current_user)
 
-# Starts the OATH2.0 flow with Strava
+# Brings up the main page and asks if you have an account. 
 @app.route("/")
-def homepage():
-    return '''
-        <h1>Welcome to the Strava Data App</h1>
-        <p><a href="/authorize">Click here to authorize with Strava</a></p>
-        <a href="/powercurve">Generate My Power Curve</a><br>
-        '''
+def landing():
+    # If user is logged in, redirect to /home. Otherwise, show landing page.
+    if current_user.is_authenticated:
+        return redirect("/home")
+    return render_template("landing.html")
 
 # Authorizing the Application to work with your strava
 @app.route("/authorize")
 def authorize():
+    # Redirect to Strava's OAuth page
     auth_url = (
         f"https://www.strava.com/oauth/authorize"
         f"?client_id={STRAVA_CLIENT_ID}"
@@ -145,58 +107,48 @@ def authorize():
     )
     return redirect(auth_url)
 
-# Sends you to the callback page and lets go to the next step
+# Strava OAuth callback route
 @app.route("/strava/callback")
 def callback():
-    code = request.args.get('code')
-    if not code:
-        return "Authorization failed. No code provided.", 400
-    token_response = requests.post("https://www.strava.com/oauth/token", data={
-        'client_id': STRAVA_CLIENT_ID,
-        'client_secret': STRAVA_CLIENT_SECRET,
-        'code': code,
-        'grant_type': 'authorization_code'},
-        verify=False) # DISABLES TESTING WILL NEED TO BE REMOVED FOR PRODUCTION)
+    # Get the authorization code returned by Strava after user approval
+    code = request.args.get("code")
     
+    # Exchange the authorization code for an access token
+    token_response = requests.post(
+        "https://www.strava.com/oauth/token",
+        data={
+            "client_id": STRAVA_CLIENT_ID,
+            "client_secret": STRAVA_CLIENT_SECRET,
+            "code": code,
+            "grant_type": "authorization_code",
+        }, verify=False # Added verify=False to avoid SSL issues during local testing
+    )
+    # Parse the response JSON to extract the access token and athlete info
     token_json = token_response.json()
-    access_token = token_json.get('access_token')
+    pretty_print(token_json)  # Debug: print the full JSON response
+    access_token = token_json["access_token"]
+    session['access_token'] = access_token  # Store access token in session for later use
+    athlete = token_json["athlete"]
+    strava_id = str(athlete["id"])
+    strava_name = athlete.get("username", "")
 
-    if access_token:
-        session['access_token'] = access_token
-        # Get athlete ID
-        athlete_response = requests.get("https://www.strava.com/api/v3/athlete",
-                                        headers={"Authorization": f"Bearer {access_token}"},
-                                        verify=False)
-        # If we get a good response, save the athlete ID in session
-        if athlete_response.status_code == 200:
-            # Save the response data as a JSON string and extract each item
-            athlete_json = athlete_response.json()
-            athlete_id = athlete_json.get('id')
-            session['athlete_id'] = athlete_id
-            username = f"{athlete_json.get('firstname','')} {athlete_json.get('lastname','')}".strip()     
-            
-            # Save user in database if not already present 
-            # Takes the user table/cass from models.py and does a filter query
-            user = User.query.filter_by(strava_id=str(athlete_id)).first()
-            # If not found, added it
-            if not user:
-                user = User(strava_id=str(athlete_id), access_token=access_token, 
-                            username=username)
-                db.session.add(user)
-            else:
-                user.access_token = access_token # Update access token if changed
-            db.session.commit()
-        else:
-            return "Failed to fetch athlete information.", 500
-        
-        # If you get a good token, let the user know and give options for next steps
-        return '''
-            <h1>Authorization successful!</h1>
-            <p><a href="/activities">View your recent cycling activities</a></p>
-            <p><a href="/powercurve">Generate your PowerCurve</a></p>
-        '''
+    # Look up the user in the database by Strava ID
+    user = User.query.filter_by(strava_id=strava_id).first()
+    if not user:
+        # If user does not exist, create a new user record
+        user = User(strava_id=strava_id, access_token=access_token, strava_name=strava_name)
+        db.session.add(user)
     else:
-        return "Authorization failed. No access token received.", 400
+        # If user exists, update their access token and Strava username
+        user.access_token = access_token
+        user.strava_name = strava_name
+    db.session.commit()
+    
+    # Log the user in using Flask-Login
+    session['strava_id'] = strava_id  # <-- Changed from 'athlete_id' to 'strava_id'
+    login_user(user)
+    # Redirect to the home page after successful login
+    return redirect("/home")
 
 
 # Grabbing data from specific activities to start
@@ -240,6 +192,7 @@ def activities():
 
 # Generate Power Curve from last 5 rides
 @app.route("/powercurve")
+@login_required
 def powercurve():
     # Creating the HTML return text
     html = "<h1>You Power Curve From Your Last 5 Rides</h1>"
@@ -307,21 +260,21 @@ def powercurve():
 
 
     # Save PowerCurve to database
-    athlete_id = session.get('athlete_id') # Get athlete ID from session
-    user = User.query.filter_by(strava_id=str(athlete_id)).first()
+    strava_id = session.get('strava_id')  # <-- Changed from 'athlete_id'
+    user = User.query.filter_by(strava_id=str(strava_id)).first()
     # Look up the user name based on athlete ID to save into PowerCurve DB
-    username = user.username if user else "Unknown"
+    strava_id = user.strava_id if user else "Unknown"
     if user: # Delete old powercurve entries for user
         PowerCurve.query.filter_by(user_id=user.id).delete()
         new_power_curve = PowerCurve(
             user_id=user.id,
-            activity_id=str(rides_with_power[0][0]), # Use the first ride's ID as a reference
-            curve=powercurve, # Save the generated power curve as JSON
-            username=username
+            activity_id=str(rides_with_power[0][0]),
+            curve=powercurve,
+            strava_id=strava_id
         )
         db.session.add(new_power_curve)
         db.session.commit()
-    else: # Handle case where user is not found
+    else:
         return "<h1>User not found. Please authorize the application first.</h1>", 400
 
     # Create a Power Curve plot 
@@ -341,14 +294,17 @@ def powercurve():
     html += f'<img src="data:image/png;base64,{img_base64}"/>'
     
     # Display HTML in the site
-    return html
+    return render_template(
+        "powercurve.html",
+        img_base64=img_base64
+    )
 
 # Route to compare power curves between users
 @app.route("/compare", methods=["GET", "POST"])
+@login_required
 def compare():
-    # Take the current session ID and query the DB for the user
-    current_user_id = session.get('athlete_id')
-    current_user = User.query.filter_by(strava_id=str(current_user_id)).first()
+    strava_id = session.get('strava_id')  # <-- Changed from 'athlete_id'
+    current_user = User.query.filter_by(strava_id=str(strava_id)).first()
     if not current_user:
         html = "<h1>No user found. Please authorize first.</h1>"
         return html, 404
@@ -377,7 +333,7 @@ def compare():
             )
             if other_power_curve:
                 other_curve = other_power_curve.curve
-                other_username = other_user.username 
+                other_username = other_user.strava_id
 
     # Get the current user's curve
     current_user_curve = (
@@ -403,7 +359,7 @@ def compare():
 
     # Making the plot window
     fig, ax = plt.subplots()
-    ax.plot(current_x, current_y, marker='o', label=f"{current_user.username}'s Curve", color='blue')
+    ax.plot(current_x, current_y, marker='o', label=f"{current_user.strava_id}'s Curve", color='blue')
     if other_curve:
         ax.plot(other_x, other_y, marker='o', label=f"{other_username}'s Curve", color='orange')
     ax.set_xlabel('Duration (seconds)')
@@ -423,14 +379,19 @@ def compare():
     dropdown_html += '<option value="">Select a user to compare</option>'
     for user in users_with_curves:
         selected = 'selected' if other_user_id and str(user.id) == other_user_id else ''
-        dropdown_html += f'<option value="{user.id}" {selected}>{user.username}</option>'  
+        dropdown_html += f'<option value="{user.id}" {selected}>{user.strava_id}</option>'  
     dropdown_html += '</select><input type="submit" value="Compare"></form>'
 
     html = "<h1>Compare Power Curves</h1>"
     html += dropdown_html
     html += f'<img src="data:image/png;base64,{img_base64}"/>'
 
-    return html
+    return render_template(
+        "compare.html",
+        users_with_curves=users_with_curves,
+        img_base64=img_base64,
+        other_user_id=other_user_id
+    )
 
 
 
