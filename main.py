@@ -70,40 +70,6 @@ login_manager.init_app(app)
 def load_user(user_id):
     return User.query.get(int(user_id)) 
 
-@app.route("/signup", methods=["GET", "POST"])
-def signup():
-    if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
-        if User.query.filter_by(username=username).first():
-            return render_template("signup.html", error="Username already exists.")
-        user = User(username=username)
-        user.set_password(password)
-        db.session.add(user)
-        db.session.commit()
-        login_user(user)
-        return redirect("/home")
-    else:
-        return render_template("signup.html", error=None)
-    
-# Route for user login (handles both GET and POST requests)
-@app.route("/login", methods=["GET", "POST"])
-def login():
-    # If the request is a POST (form submission)
-    if request.method == "POST":
-        # Look up the user by username in the database
-        user = User.query.filter_by(username=request.form["username"]).first()
-        # If user exists and password is correct
-        if user and user.check_password(request.form["password"]):
-            # Log the user in (sets session)
-            login_user(user)
-            # Redirect to the home page after successful login
-            return redirect("/home")
-        # If login fails, show error message on login page
-        return render_template("login.html", error="Invalid username or password.")
-    # If GET request, just render the login page with no error
-    return render_template("login.html", error=None)
-
 @app.route("/logout")
 @login_required
 def logout():
