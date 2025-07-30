@@ -7,6 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from models import db, User, PowerCurve  # Ensure User model includes username field
 from random import randint, uniform
 from flask import Flask
+from utils.pretty_print import print_db_state
 
 def create_dummy_data(app):
     with app.app_context():
@@ -27,7 +28,20 @@ def create_dummy_data(app):
                 print(f"Added user {user.strava_name} with Strava ID {user.strava_id}")
         
             # Create a Power Curve for each user
-            curve = {str(t): round(uniform(100, 400), 2) for t in range(1, 3601)}
+            durations = [5, 10, 20, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 3600]
+            max_power = round(uniform(100, 1000), 2)
+            curve = {}
+            prev_power = max_power
+            for duration in durations:
+                # For the first duration, use max_power; for others, decrease by a random amount
+                if duration == durations[0]:
+                    power = prev_power
+                else:
+                    # Decrease by a random value between 5 and 20, but not below 100
+                    decrease = round(uniform(5, 20), 2)
+                    power = max(100, prev_power - decrease)
+                curve[str(duration)] = power
+                prev_power = power
             power_curve = PowerCurve(
                 user_id=user.id,
                 strava_id=user.strava_id,
@@ -37,4 +51,4 @@ def create_dummy_data(app):
             db.session.add(power_curve)
             print(f"Added PowerCurve for user {user.strava_name}")
     db.session.commit()
-    
+    print_db_state(db, User, PowerCurve, label="User State after Dummy Data added")

@@ -6,7 +6,7 @@
         <option value="">Select a user to compare</option>
         {% for user in users_with_curves %}
             <option value="{{ user.id }}" {% if other_user_id and user.id|string == other_user_id %}selected{% endif %}>
-                {{ user.strava_id }}
+                {{ user.strava_name or user.strava_id }}
             </option>
         {% endfor %}
     </select>

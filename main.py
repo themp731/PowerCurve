@@ -14,7 +14,7 @@ import base64
 # SQLAlchemy for database handling
 from models import db, User, PowerCurve
 from utils.dummy_data import create_dummy_data
-from utils.pretty_print import pretty_print
+from utils.pretty_print import pretty_print, print_db_state
 
 # load environment variables from .env file
 load_dotenv()
@@ -53,11 +53,6 @@ db.init_app(app)
 if not os.path.exists('powercurve.db'):
     with app.app_context():
         db.create_all()
-
-# Add dummy data if now information
-with app.app_context():
-    if PowerCurve.query.count() <= 2:
-        create_dummy_data(app)
         
 # Get Credentials from environment variables
 STRAVA_CLIENT_ID = os.getenv('STRAVA_CLIENT_ID')
@@ -132,6 +127,9 @@ def callback():
     strava_id = str(athlete["id"])
     strava_name = athlete.get("username", "")
 
+    # Debug statement:
+    print_db_state(db, User, PowerCurve, label="BEFORE add new user")
+
     # Look up the user in the database by Strava ID
     user = User.query.filter_by(strava_id=strava_id).first()
     if not user:
@@ -148,6 +146,7 @@ def callback():
     session['strava_id'] = strava_id  # <-- Changed from 'athlete_id' to 'strava_id'
     login_user(user)
     # Redirect to the home page after successful login
+    print_db_state(db, User, PowerCurve, label="AFTER new user")
     return redirect("/home")
 
 
@@ -194,8 +193,9 @@ def activities():
 @app.route("/powercurve")
 @login_required
 def powercurve():
-    # Creating the HTML return text
-    html = "<h1>You Power Curve From Your Last 5 Rides</h1>"
+    html = "<h1>Your Power Curve</h1>"
+    # Debug statement
+    print_db_state(db, User, PowerCurve, label="BEFORE /powercurve")
     
     # Get the access token from session and if not reauthorize
     access_token = session.get('access_token')
@@ -264,8 +264,8 @@ def powercurve():
     user = User.query.filter_by(strava_id=str(strava_id)).first()
     # Look up the user name based on athlete ID to save into PowerCurve DB
     strava_id = user.strava_id if user else "Unknown"
-    if user: # Delete old powercurve entries for user
-        PowerCurve.query.filter_by(user_id=user.id).delete()
+    if user:  # Delete old powercurve entries for user based on strava_id
+        PowerCurve.query.filter_by(strava_id=strava_id).delete()
         new_power_curve = PowerCurve(
             user_id=user.id,
             activity_id=str(rides_with_power[0][0]),
@@ -274,6 +274,8 @@ def powercurve():
         )
         db.session.add(new_power_curve)
         db.session.commit()
+        # Debug statement
+        print_db_state(db, User, PowerCurve, label="AFTER /powercurve")
     else:
         return "<h1>User not found. Please authorize the application first.</h1>", 400
 
@@ -303,13 +305,16 @@ def powercurve():
 @app.route("/compare", methods=["GET", "POST"])
 @login_required
 def compare():
-    strava_id = session.get('strava_id')  # <-- Changed from 'athlete_id'
+    html = "<h1>Power Curve Comparison</h1>"
+    # Get the current user's Strava ID from the session (set after login/callback)
+    strava_id = session.get('strava_id')  # <-- session stores the logged-in user's Strava ID
     current_user = User.query.filter_by(strava_id=str(strava_id)).first()
     if not current_user:
+        # If no user is found, prompt to authorize
         html = "<h1>No user found. Please authorize first.</h1>"
         return html, 404
-    
-    # Get the list of users with at least one curve except current user
+
+    # Query all users (except the current user) who have at least one PowerCurve
     users_with_curves = (
         db.session.query(User)
         .join(PowerCurve, User.id == PowerCurve.user_id)
@@ -318,14 +323,17 @@ def compare():
         .all()
     )
 
-    # Now compare the different users with the different curves.
+    # Get the user ID selected from the dropdown in the compare form (POST request)
+    # The dropdown in the HTML form has name="compare_user"
+    # This value comes from the <select name="compare_user"> in the compare.html template
     other_user_id = request.form.get("compare_user")
     other_curve = None
     other_username = None
     if other_user_id:
+        # If a user was selected, fetch that user by their internal user.id
         other_user = User.query.filter_by(id=int(other_user_id)).first()
         if other_user:
-            # Get the latest power curve for the selected user
+            # Get the latest PowerCurve for the selected user
             other_power_curve = (
                 PowerCurve.query.filter_by(user_id=other_user.id)
                 .order_by(PowerCurve.created_at.desc())
@@ -333,33 +341,35 @@ def compare():
             )
             if other_power_curve:
                 other_curve = other_power_curve.curve
-                other_username = other_user.strava_id
+                # Use display name if available, otherwise fallback to Strava ID
+                other_username = other_user.strava_name or other_user.strava_id
 
-    # Get the current user's curve
+    # Get the current user's latest PowerCurve
     current_user_curve = (
         PowerCurve.query.filter_by(user_id=current_user.id)
         .order_by(PowerCurve.created_at.desc())
         .first()
     )
     if not current_user_curve:
+        # If the current user has no PowerCurve, prompt to generate one
         html = "<h1>No power curve found for the current user. Please generate one first.</h1>"
         return html, 404
-    
 
-    # Extract the data from the JSON
+    # Extract the data from the JSON field in the PowerCurve
     current_curve = current_user_curve.curve
     current_x = sorted([int(k) for k in current_curve.keys()])
     current_y = [current_curve[str(k)] for k in current_x]
-    
-    # Plot the curves
+
+    # Prepare the other user's curve if selected
     other_x = other_y = []
     if other_curve:
         other_x = sorted([int(k) for k in other_curve.keys()])
         other_y = [other_curve[str(k)] for k in other_x]
 
-    # Making the plot window
+    # Plot both curves using matplotlib
     fig, ax = plt.subplots()
-    ax.plot(current_x, current_y, marker='o', label=f"{current_user.strava_id}'s Curve", color='blue')
+    # Use display name for legend if available
+    ax.plot(current_x, current_y, marker='o', label=f"{current_user.strava_name or current_user.strava_id}'s Curve", color='blue')
     if other_curve:
         ax.plot(other_x, other_y, marker='o', label=f"{other_username}'s Curve", color='orange')
     ax.set_xlabel('Duration (seconds)')
@@ -367,33 +377,46 @@ def compare():
     ax.set_title('Power Curve Comparison')
     ax.legend()
 
-    # Handle the buffering
+    # Save the plot to a buffer and encode as base64 for HTML display
+
+    # Create an in-memory bytes buffer (no file is written to disk)
     buf = io.BytesIO()
+
+    # Save the matplotlib figure as a PNG image into the buffer
     plt.savefig(buf, format='png')
+
+    # Move the buffer's cursor to the beginning so we can read its contents
     buf.seek(0)
-    img_base64 = base64.b64encode(buf.read()).decode('utf-8')   # Read the PNG bytes and encode as base64
+
+    # Read the PNG image bytes from the buffer and encode them as a base64 string
+    # This allows us to embed the image directly in an HTML <img> tag
+    img_base64 = base64.b64encode(buf.read()).decode('utf-8')
+
+    # Close the matplotlib figure to free up memory
     plt.close(fig)
 
-    # Make the dropdown for the HMTL
-    dropdown_html = '<form method="POST"><select name="compare_user">'
-    dropdown_html += '<option value="">Select a user to compare</option>'
-    for user in users_with_curves:
-        selected = 'selected' if other_user_id and str(user.id) == other_user_id else ''
-        dropdown_html += f'<option value="{user.id}" {selected}>{user.strava_id}</option>'  
-    dropdown_html += '</select><input type="submit" value="Compare"></form>'
+    # The dropdown for selecting a user to compare is rendered in the template,
+    # but here's how the value is passed:
+    # <form method="POST">
+    #   <select name="compare_user">...</select>
+    #   <input type="submit" value="Compare">
+    # </form>
+    # When the form is submitted, request.form.get("compare_user") gets the selected value.
 
-    html = "<h1>Compare Power Curves</h1>"
-    html += dropdown_html
-    html += f'<img src="data:image/png;base64,{img_base64}"/>'
-
+    # Render the compare.html template, passing all necessary data
     return render_template(
         "compare.html",
-        users_with_curves=users_with_curves,
-        img_base64=img_base64,
-        other_user_id=other_user_id
+        users_with_curves=users_with_curves,  # List of users for the dropdown
+        img_base64=img_base64,                # The plot image to display
+        other_user_id=other_user_id           # The selected user (if any)
     )
 
 
-
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()  # <-- This creates tables if they don't exist
+        # Now it's safe to query the tables
+        if PowerCurve.query.count() <= 2:
+            create_dummy_data(app)
+    
     app.run(debug=True, port=5050)
