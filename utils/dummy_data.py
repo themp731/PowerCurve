@@ -7,6 +7,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from models import db, User, PowerCurve  # Ensure User model includes username field
 from random import randint, uniform
 from flask import Flask
+from utils.pretty_print import print_db_state
 
 def create_dummy_data(app):
     with app.app_context():
@@ -50,4 +51,4 @@ def create_dummy_data(app):
             db.session.add(power_curve)
             print(f"Added PowerCurve for user {user.strava_name}")
     db.session.commit()
-    
+    print_db_state(db, User, PowerCurve, label="User State after Dummy Data added")

@@ -14,7 +14,7 @@ import base64
 # SQLAlchemy for database handling
 from models import db, User, PowerCurve
 from utils.dummy_data import create_dummy_data
-from utils.pretty_print import pretty_print
+from utils.pretty_print import pretty_print, print_db_state
 
 # load environment variables from .env file
 load_dotenv()
@@ -127,6 +127,9 @@ def callback():
     strava_id = str(athlete["id"])
     strava_name = athlete.get("username", "")
 
+    # Debug statement:
+    print_db_state(db, User, PowerCurve, label="BEFORE add new user")
+
     # Look up the user in the database by Strava ID
     user = User.query.filter_by(strava_id=strava_id).first()
     if not user:
@@ -143,6 +146,7 @@ def callback():
     session['strava_id'] = strava_id  # <-- Changed from 'athlete_id' to 'strava_id'
     login_user(user)
     # Redirect to the home page after successful login
+    print_db_state(db, User, PowerCurve, label="AFTER new user")
     return redirect("/home")
 
 
@@ -189,8 +193,9 @@ def activities():
 @app.route("/powercurve")
 @login_required
 def powercurve():
-    # Creating the HTML return text
-    html = "<h1>You Power Curve From Your Last 5 Rides</h1>"
+    html = "<h1>Your Power Curve</h1>"
+    # Debug statement
+    print_db_state(db, User, PowerCurve, label="BEFORE /powercurve")
     
     # Get the access token from session and if not reauthorize
     access_token = session.get('access_token')
@@ -269,6 +274,8 @@ def powercurve():
         )
         db.session.add(new_power_curve)
         db.session.commit()
+        # Debug statement
+        print_db_state(db, User, PowerCurve, label="AFTER /powercurve")
     else:
         return "<h1>User not found. Please authorize the application first.</h1>", 400
 
@@ -298,6 +305,7 @@ def powercurve():
 @app.route("/compare", methods=["GET", "POST"])
 @login_required
 def compare():
+    html = "<h1>Power Curve Comparison</h1>"
     # Get the current user's Strava ID from the session (set after login/callback)
     strava_id = session.get('strava_id')  # <-- session stores the logged-in user's Strava ID
     current_user = User.query.filter_by(strava_id=str(strava_id)).first()
