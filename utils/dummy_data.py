@@ -27,7 +27,20 @@ def create_dummy_data(app):
                 print(f"Added user {user.strava_name} with Strava ID {user.strava_id}")
         
             # Create a Power Curve for each user
-            curve = {str(t): round(uniform(100, 400), 2) for t in range(1, 3601)}
+            durations = [5, 10, 20, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 3600]
+            max_power = round(uniform(100, 1000), 2)
+            curve = {}
+            prev_power = max_power
+            for duration in durations:
+                # For the first duration, use max_power; for others, decrease by a random amount
+                if duration == durations[0]:
+                    power = prev_power
+                else:
+                    # Decrease by a random value between 5 and 20, but not below 100
+                    decrease = round(uniform(5, 20), 2)
+                    power = max(100, prev_power - decrease)
+                curve[str(duration)] = power
+                prev_power = power
             power_curve = PowerCurve(
                 user_id=user.id,
                 strava_id=user.strava_id,
