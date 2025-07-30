@@ -53,11 +53,6 @@ db.init_app(app)
 if not os.path.exists('powercurve.db'):
     with app.app_context():
         db.create_all()
-
-# Add dummy data if now information
-with app.app_context():
-    if PowerCurve.query.count() <= 2:
-        create_dummy_data(app)
         
 # Get Credentials from environment variables
 STRAVA_CLIENT_ID = os.getenv('STRAVA_CLIENT_ID')
@@ -264,8 +259,8 @@ def powercurve():
     user = User.query.filter_by(strava_id=str(strava_id)).first()
     # Look up the user name based on athlete ID to save into PowerCurve DB
     strava_id = user.strava_id if user else "Unknown"
-    if user: # Delete old powercurve entries for user
-        PowerCurve.query.filter_by(user_id=user.id).delete()
+    if user:  # Delete old powercurve entries for user based on strava_id
+        PowerCurve.query.filter_by(strava_id=strava_id).delete()
         new_power_curve = PowerCurve(
             user_id=user.id,
             activity_id=str(rides_with_power[0][0]),
@@ -409,6 +404,11 @@ def compare():
     )
 
 
-
 if __name__ == "__main__":
+    with app.app_context():
+        db.create_all()  # <-- This creates tables if they don't exist
+        # Now it's safe to query the tables
+        if PowerCurve.query.count() <= 2:
+            create_dummy_data(app)
+    
     app.run(debug=True, port=5050)

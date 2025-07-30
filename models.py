@@ -1,13 +1,13 @@
 # File for handling the SQLite database
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
-from werkzeug.security import generate_password_hash, check_password_hash
 
 # Create a SLQAlchemy instance
 db = SQLAlchemy()
 
 # User model for storing user information
 class User(db.Model, UserMixin):
+    __tablename__ = 'user'  # Explicit table name for clarity and compatibility
     id = db.Column(db.Integer, primary_key=True)  # Primary key for the user table
     strava_id = db.Column(db.String(50), unique=True, nullable=False)  # Strava user ID (from Strava)
     access_token = db.Column(db.String, nullable=False)  # OAuth access token for Strava API
@@ -15,10 +15,10 @@ class User(db.Model, UserMixin):
 
 # Model for storing PowerCurve data
 class PowerCurve(db.Model):
+    __tablename__ = 'power_curve'  # Explicit table name for clarity and compatibility
     id = db.Column(db.Integer, primary_key=True)  # Primary key for the power curve table
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)  # Reference to User table
     strava_id = db.Column(db.String(80), nullable=False)  # Strava user ID (from Strava)
-    strava_name = db.Column(db.String(100))  # Display name from Strava (easy to read)
     activity_id = db.Column(db.String(50), nullable=False)  # Strava activity ID
     curve = db.Column(db.JSON, nullable=False)  # Power curve data stored as JSON
     created_at = db.Column(db.DateTime, server_default=db.func.now())  # Timestamp when record was created
