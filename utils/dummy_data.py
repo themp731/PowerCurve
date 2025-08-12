@@ -25,7 +25,6 @@ def create_dummy_data(app):
                 user = User(**user_info)
                 db.session.add(user)
                 db.session.commit()
-                print(f"Added user {user.strava_name} with Strava ID {user.strava_id}")
         
             # Create a Power Curve for each user
             durations = [5, 10, 20, 30, 60, 120, 180, 300, 600, 900, 1200, 1800, 3600]
@@ -48,7 +47,11 @@ def create_dummy_data(app):
                 activity_id=f"dummy_activity_{randint(1, 10000)}",
                 curve=curve
             )
+            print(f'Adding user: {power_curve.user_id} \n with curve: {power_curve.curve}')
             db.session.add(power_curve)
-            print(f"Added PowerCurve for user {user.strava_name}")
-    db.session.commit()
-    print_db_state(db, User, PowerCurve, label="User State after Dummy Data added")
+            try:
+                db.session.commit()
+                print(f"PowerCurve added for {user.strava_name}")
+            except Exception as e:
+                print(f"Error adding PowerCurve for {user.strava_name}: {e}")
+    print_db_state(db, User, PowerCurve, label="DUMMY DATA CREATED")
