@@ -38,12 +38,14 @@ jobs:
         STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
         STRAVA_REDIRECT_URI: ${{ secrets.STRAVA_REDIRECT_URI }}
       run: |
-        zip -r powercurve.zip . -x "venv/*" "*.git*" "__pycache__/*" # Zip project files, exclude unnecessary folders
+        zip -r powercurve.zip . -x "venv/*" "*.git*" "__pycache__/*"
         aws elasticbeanstalk create-application-version \
           --application-name "PowerCurveApp" \
           --version-label "v-${{ github.sha }}" \
-          --source-bundle S3Bucket="elasticbeanstalk-bucket",S3Key="powercurve.zip" # Create new EB app version
+          --source-bundle S3Bucket="elasticbeanstalk-us-east-2-431217666553",S3Key="powercurve.zip" \
+           $--regionAWS_REGION
         aws elasticbeanstalk update-environment \
           --application-name "PowerCurveApp" \
           --environment-name "flask-env" \
-          --version-label "v-${{ github.sha }}" # Deploy new version to EB environment
+          --version-label "v-${{ github.sha }}" \
+          --region $AWS_REGION
