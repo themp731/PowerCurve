@@ -61,3 +61,7 @@ jobs:
           --environment-name "PowerCurve-env" \
           --version-label "v-${{ github.sha }}" \
           --region $AWS_REGION
+    
+    - name: Start Application
+      run: |
+        gunicorn -b 0.0.0.0:5000 main:app
