@@ -418,5 +418,5 @@ if __name__ == "__main__":
         # Now it's safe to query the tables
         if PowerCurve.query.count() <= 2:
             create_dummy_data(app)
-    
-    app.run(debug=True, port=5050)
+    # Run on port 5000 because it should work with Elastic Beanstalk
+    app.run(debug=True, port=5000, host="0.0.0.0")
