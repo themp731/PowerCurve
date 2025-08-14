@@ -48,16 +48,15 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         AWS_REGION: ${{ secrets.AWS_REGION }}
         STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
-        STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}           # Strava API client secret from GitHub secrets
-        STRAVA_REDIRECT_URI: ${{ secrets.STRAVA_REDIRECT_URI }}             # Strava API redirect URI from GitHub secrets
-        run: | # Create a new application version in Elastic Beanstalk using the uploaded ZIP file
-          aws elasticbeanstalk create-application-version \
+        STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+        STRAVA_REDIRECT_URI: ${{ secrets.STRAVA_REDIRECT_URI }}
+      run: |
+        aws elasticbeanstalk create-application-version \
           --application-name "PowerCurve" \
           --version-label "v-${{ github.sha }}" \
           --source-bundle S3Bucket="elasticbeanstalk-us-east-2-431217666553",S3Key="powercurve.zip" \
           --region $AWS_REGION
-  
-          aws elasticbeanstalk update-environment \
+        aws elasticbeanstalk update-environment \
           --application-name "PowerCurve" \
           --environment-name "flask-env" \
           --version-label "v-${{ github.sha }}" \
