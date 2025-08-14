@@ -32,7 +32,7 @@ jobs:
     # EXPLICITLY CREATING ZIP FILE AND SAVING IT TO ELASTIC BEANSTALK
     - name: Create ZIP File
       run: |
-      zip -r powercurve.zip . -x "venv/*" "*.git*" "__pycache__/*"
+        zip -r powercurve.zip . -x "venv/*" "*.git*" "__pycache__/*"
 
     - name: Upload ZIP to S3
       env:
@@ -40,7 +40,7 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
       run: |
-      aws s3 cp powercurve.zip s3://elasticbeanstalk-us-east-2-431217666553/powercurve.zip --region $AWS_REGION
+        aws s3 cp powercurve.zip s3://elasticbeanstalk-us-east-2-431217666553/powercurve.zip --region $AWS_REGION
 
     - name: Deploy to Elastic Beanstalk
       env:
