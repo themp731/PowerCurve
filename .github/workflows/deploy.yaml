@@ -1,45 +1,48 @@
-name: Deploy to Elastic Beanstalk
+name: Deploy to Elastic Beanstalk # Workflow name shown in GitHub Actions UI
 
 on:
   push:
     branches:
-      - main
+      - beanstalk1 # Trigger workflow only on pushes to 'beanstalk1' branch
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # Use the latest Ubuntu runner
 
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v3 # Check out repository code
 
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v4 # Set up Python environment
       with:
-        python-version: 3.12
+        python-version: 3.12 # Specify Python version
 
     - name: Install AWS CLI
       run: |
         sudo apt-get update
-        sudo apt-get install -y awscli
+        sudo apt-get install -y awscli # Install AWS CLI tool
 
     - name: Install Dependencies
       run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        python -m pip install --upgrade pip # Upgrade pip
+        pip install -r requirements.txt     # Install Python dependencies
 
     - name: Deploy to Elastic Beanstalk
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}         # AWS credentials from GitHub secrets
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}                       # AWS region from secrets
+        STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}           # Strava API credentials from secrets
+        STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+        STRAVA_REDIRECT_URI: ${{ secrets.STRAVA_REDIRECT_URI }}
       run: |
-        zip -r powercurve.zip . -x "venv/*" "*.git*" "__pycache__/*"
+        zip -r powercurve.zip . -x "venv/*" "*.git*" "__pycache__/*" # Zip project files, exclude unnecessary folders
         aws elasticbeanstalk create-application-version \
           --application-name "PowerCurveApp" \
           --version-label "v-${{ github.sha }}" \
-          --source-bundle S3Bucket="elasticbeanstalk-bucket",S3Key="powercurve.zip"
+          --source-bundle S3Bucket="elasticbeanstalk-bucket",S3Key="powercurve.zip" # Create new EB app version
         aws elasticbeanstalk update-environment \
           --application-name "PowerCurveApp" \
           --environment-name "flask-env" \
-          --version-label "v-${{ github.sha }}"
+          --version-label "v-${{ github.sha }}" # Deploy new version to EB environment
