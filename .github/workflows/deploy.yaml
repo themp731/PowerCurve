@@ -43,7 +43,7 @@ jobs:
           --application-name "PowerCurveApp" \
           --version-label "v-${{ github.sha }}" \
           --source-bundle S3Bucket="elasticbeanstalk-us-east-2-431217666553",S3Key="powercurve.zip" \
-           $--regionAWS_REGION
+          --region $AWS_REGION
         aws elasticbeanstalk update-environment \
           --application-name "PowerCurveApp" \
           --environment-name "flask-env" \
