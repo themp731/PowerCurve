@@ -58,6 +58,6 @@ jobs:
           --region $AWS_REGION
         aws elasticbeanstalk update-environment \
           --application-name "PowerCurve" \
-          --environment-name "flask-env" \
+          --environment-name "PowerCurve-env" \
           --version-label "v-${{ github.sha }}" \
           --region $AWS_REGION
