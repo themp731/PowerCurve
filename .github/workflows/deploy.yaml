@@ -29,16 +29,28 @@ jobs:
         python -m pip install --upgrade pip # Upgrade pip
         pip install -r requirements.txt     # Install Python dependencies
 
+    # EXPLICITLY CREATING ZIP FILE AND SAVING IT TO ELASTIC BEANSTALK
+    - name: Create ZIP File
+      run: |
+      zip -r powercurve.zip . -x "venv/*" "*.git*" "__pycache__/*"
+
+    - name: Upload ZIP to S3
+      env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      run: |
+      aws s3 cp powercurve.zip s3://elasticbeanstalk-us-east-2-431217666553/powercurve.zip --region $AWS_REGION
+
     - name: Deploy to Elastic Beanstalk
       env:
-        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}         # AWS credentials from GitHub secrets
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        AWS_REGION: ${{ secrets.AWS_REGION }}                       # AWS region from secrets
-        STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}           # Strava API credentials from secrets
-        STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
-        STRAVA_REDIRECT_URI: ${{ secrets.STRAVA_REDIRECT_URI }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+      STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+      STRAVA_REDIRECT_URI: ${{ secrets.STRAVA_REDIRECT_URI }}
       run: |
-        zip -r powercurve.zip . -x "venv/*" "*.git*" "__pycache__/*"
         aws elasticbeanstalk create-application-version \
           --application-name "PowerCurveApp" \
           --version-label "v-${{ github.sha }}" \
