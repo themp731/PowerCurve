@@ -1,0 +1,63 @@
+name: Deploy to Elastic Beanstalk # Workflow name shown in GitHub Actions UI
+
+on:
+  push:
+    branches:
+      - beanstalk1 # Trigger workflow only on pushes to 'beanstalk1' branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest # Use the latest Ubuntu runner
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v3 # Check out repository code
+
+    - name: Set up Python
+      uses: actions/setup-python@v4 # Set up Python environment
+      with:
+        python-version: 3.12 # Specify Python version
+
+    - name: Install AWS CLI
+      run: |
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        unzip awscliv2.zip
+        sudo ./aws/install --update
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip # Upgrade pip
+        pip install -r requirements.txt     # Install Python dependencies
+
+    # EXPLICITLY CREATING ZIP FILE AND SAVING IT TO ELASTIC BEANSTALK
+    - name: Create ZIP File
+      run: |
+        zip -r powercurve.zip . -x "venv/*" "*.git*" "__pycache__/*"
+
+    - name: Upload ZIP to S3
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+      run: |
+        aws s3 cp powercurve.zip s3://elasticbeanstalk-us-east-2-431217666553/powercurve.zip --region $AWS_REGION
+
+    - name: Deploy to Elastic Beanstalk
+      env:
+        AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        AWS_REGION: ${{ secrets.AWS_REGION }}
+        STRAVA_CLIENT_ID: ${{ secrets.STRAVA_CLIENT_ID }}
+        STRAVA_CLIENT_SECRET: ${{ secrets.STRAVA_CLIENT_SECRET }}
+        STRAVA_REDIRECT_URI: ${{ secrets.STRAVA_REDIRECT_URI }}
+      run: |
+        aws elasticbeanstalk create-application-version \
+          --application-name "PowerCurve" \
+          --version-label "v-${{ github.sha }}" \
+          --source-bundle S3Bucket="elasticbeanstalk-us-east-2-431217666553",S3Key="powercurve.zip" \
+          --region $AWS_REGION
+        aws elasticbeanstalk update-environment \
+          --application-name "PowerCurve" \
+          --environment-name "PowerCurve-env" \
+          --version-label "v-${{ github.sha }}" \
+          --region $AWS_REGION
