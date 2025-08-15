@@ -419,4 +419,4 @@ if __name__ == "__main__":
         if PowerCurve.query.count() <= 2:
             create_dummy_data(app)
     # Run on port 8080 because it should work with Elastic Beanstalk
-    app.run(debug=True, port=8080, host="0.0.0.0")
+    app.run(debug=True, port=8000, host="0.0.0.0")
