@@ -86,7 +86,9 @@ def landing():
     # If user is logged in, redirect to /home. Otherwise, show landing page.
     if current_user.is_authenticated:
         return redirect("/home")
-    return render_template("landing.html")
+    else:
+        user_count = User.query.count()
+        return render_template("landing.html", user_count=user_count)
 
 # Authorizing the Application to work with your strava
 @app.route("/authorize")
@@ -127,9 +129,6 @@ def callback():
     strava_id = str(athlete["id"])
     strava_name = athlete.get("username", "")
 
-    # Debug statement:
-    print_db_state(db, User, PowerCurve, label="BEFORE add new user")
-
     # Look up the user in the database by Strava ID
     user = User.query.filter_by(strava_id=strava_id).first()
     if not user:
@@ -146,7 +145,6 @@ def callback():
     session['strava_id'] = strava_id  # <-- Changed from 'athlete_id' to 'strava_id'
     login_user(user)
     # Redirect to the home page after successful login
-    print_db_state(db, User, PowerCurve, label="AFTER new user")
     return redirect("/home")
 
 
@@ -415,6 +413,7 @@ def compare():
 @app.route("/delete-data", methods=["POST"])
 def delete_data():
     try:
+        print_db_state(db, User, PowerCurve, label="BEFORE DELETE USER DATA")
         # Get the current user's Strava ID
         strava_id = current_user.strava_id
 
@@ -431,6 +430,7 @@ def delete_data():
         logout_user()
 
         flash("Your data has been deleted successfully.", "success")
+        print_db_state(db, User, PowerCurve, label="After DELETE USER DATA")
         return redirect(url_for("home"))
     except Exception as e:
         db.session.rollback()
