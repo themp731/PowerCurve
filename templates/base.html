@@ -1,13 +1,17 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>PowerCurve</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}PowerCurve{% endblock %}</title>
 </head>
 <body>
-    <header>
-        <h2>MP's Power Curve Comparison Tool</h2>
-    </header>
-    <hr>
-    {% block content %}{% endblock %}
+    {% block content %}
+    <!-- Page-specific content will go here -->
+    {% endblock %}
+
+    <footer>
+        <p><a href="{{ url_for('privacy_policy') }}">Privacy Policy</a></p>
+    </footer>
 </body>
 </html>

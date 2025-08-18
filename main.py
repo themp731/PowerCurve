@@ -411,6 +411,10 @@ def compare():
         other_user_id=other_user_id           # The selected user (if any)
     )
 
+# Route to publish the privacy policy template
+@app.route("/privacy_policy")
+def privacy_policy():
+    return render_template("privacy_policy.html")
 
 if __name__ == "__main__":
     with app.app_context():
