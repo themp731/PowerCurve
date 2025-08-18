@@ -1,6 +1,6 @@
 # Entry Point for the flask application
 
-from flask import Flask, redirect, request, session, render_template
+from flask import Flask, redirect, request, session, render_template, flash, url_for
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import os
 import numpy as np
@@ -410,6 +410,33 @@ def compare():
         img_base64=img_base64,                # The plot image to display
         other_user_id=other_user_id           # The selected user (if any)
     )
+
+# Route for deleting data of logged in users to to comply with GDPR
+@app.route("/delete-data", methods=["POST"])
+def delete_data():
+    try:
+        # Get the current user's Strava ID
+        strava_id = current_user.strava_id
+
+        # Delete all PowerCurve records associated with the user
+        PowerCurve.query.filter_by(strava_id=strava_id).delete()
+
+        # Delete the user record
+        User.query.filter_by(strava_id=strava_id).delete()
+
+        # Commit changes to the database
+        db.session.commit()
+
+        # Log the user out after deleting their data
+        logout_user()
+
+        flash("Your data has been deleted successfully.", "success")
+        return redirect(url_for("home"))
+    except Exception as e:
+        db.session.rollback()
+        flash(f"An error occurred while deleting your data: {str(e)}", "error")
+        return redirect(url_for("home"))
+
 
 # Route to publish the privacy policy template
 @app.route("/privacy_policy")

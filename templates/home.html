@@ -3,5 +3,19 @@
 <h1>Welcome, {{ user.strava_name}}</h1>
 <p><a href="{{ url_for('powercurve') }}">Update your Strava PowerCurve</a></p>
 <p><a href="{{ url_for('compare') }}">Compare PowerCurves</a></p>
+<!-- Delete Data Button -->
+<form action="{{ url_for('delete_data') }}" method="POST" onsubmit="return confirm('Are you sure you want to delete your data and log out? This action cannot be undone.');">
+    <button type="submit" class="btn btn-danger">Delete My Data</button>
+</form>
+{% if data_deleted %}
+    <div class="alert alert-info mt-3">
+        Your data has been deleted. You will be logged out and redirected to the landing page.
+    </div>
+    <script>
+        setTimeout(function() {
+            window.location.href = "{{ url_for('landing') }}";
+        }, 3000);
+    </script>
+{% endif %}
 <p><a href="{{ url_for('logout') }}">Logout</a></p>
 {% endblock %}
