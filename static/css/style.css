@@ -9,6 +9,9 @@ h1, h2 {
 
 footer {
     font-size: 0.9em;
+    background-color: #ffffff; /* Set background to white */
+    color: #000000; /* Set text color to black for contrast */
+    border-top: 1px solid #e0e0e0; /* Optional: Add a subtle border for separation */
 }
 
 .btn-danger {
