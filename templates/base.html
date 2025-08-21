@@ -1,13 +1,31 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>PowerCurve</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}PowerCurve{% endblock %}</title>
+    <!-- Add Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Add custom CSS -->
+    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
 </head>
-<body>
-    <header>
-        <h2>MP's Power Curve Comparison Tool</h2>
+<body class="d-flex flex-column min-vh-100">
+    <header class="bg-primary text-white text-center py-3">
+        <h1>PowerCurve</h1>
     </header>
-    <hr>
-    {% block content %}{% endblock %}
+
+    <main class="container my-4">
+        {% block content %}
+        <!-- Page-specific content will go here -->
+        {% endblock %}
+    </main>
+
+    <footer class="text-center py-3 mt-auto">
+        <img src="{{ url_for('static', filename='images/api_logo_pwrdBy_strava_horiz_orange.svg') }}" alt="Powered by Strava" style="height:40px;">
+        <p><a href="{{ url_for('privacy_policy') }}" class="text-dark">Privacy Policy</a></p>
+    </footer>
+
+    <!-- Add Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

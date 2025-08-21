@@ -1,6 +1,6 @@
 # Entry Point for the flask application
 
-from flask import Flask, redirect, request, session, render_template
+from flask import Flask, redirect, request, session, render_template, flash, url_for
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import os
 import numpy as np
@@ -86,7 +86,9 @@ def landing():
     # If user is logged in, redirect to /home. Otherwise, show landing page.
     if current_user.is_authenticated:
         return redirect("/home")
-    return render_template("landing.html")
+    else:
+        user_count = User.query.count()
+        return render_template("landing.html", user_count=user_count)
 
 # Authorizing the Application to work with your strava
 @app.route("/authorize")
@@ -127,9 +129,6 @@ def callback():
     strava_id = str(athlete["id"])
     strava_name = athlete.get("username", "")
 
-    # Debug statement:
-    print_db_state(db, User, PowerCurve, label="BEFORE add new user")
-
     # Look up the user in the database by Strava ID
     user = User.query.filter_by(strava_id=strava_id).first()
     if not user:
@@ -146,7 +145,6 @@ def callback():
     session['strava_id'] = strava_id  # <-- Changed from 'athlete_id' to 'strava_id'
     login_user(user)
     # Redirect to the home page after successful login
-    print_db_state(db, User, PowerCurve, label="AFTER new user")
     return redirect("/home")
 
 
@@ -411,6 +409,39 @@ def compare():
         other_user_id=other_user_id           # The selected user (if any)
     )
 
+# Route for deleting data of logged in users to to comply with GDPR
+@app.route("/delete-data", methods=["POST"])
+def delete_data():
+    try:
+        print_db_state(db, User, PowerCurve, label="BEFORE DELETE USER DATA")
+        # Get the current user's Strava ID
+        strava_id = current_user.strava_id
+
+        # Delete all PowerCurve records associated with the user
+        PowerCurve.query.filter_by(strava_id=strava_id).delete()
+
+        # Delete the user record
+        User.query.filter_by(strava_id=strava_id).delete()
+
+        # Commit changes to the database
+        db.session.commit()
+
+        # Log the user out after deleting their data
+        logout_user()
+
+        flash("Your data has been deleted successfully.", "success")
+        print_db_state(db, User, PowerCurve, label="After DELETE USER DATA")
+        return redirect(url_for("home"))
+    except Exception as e:
+        db.session.rollback()
+        flash(f"An error occurred while deleting your data: {str(e)}", "error")
+        return redirect(url_for("home"))
+
+
+# Route to publish the privacy policy template
+@app.route("/privacy_policy")
+def privacy_policy():
+    return render_template("privacy_policy.html")
 
 if __name__ == "__main__":
     with app.app_context():

@@ -1,0 +1,25 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f8f9fa;
+}
+
+h1, h2 {
+    font-weight: bold;
+}
+
+footer {
+    background-color: #FFF3CD; /* Light yellow/orange */
+    color: #856404; /* Darker text for contrast */
+    font-size: 0.9em;
+    border-top: 1px solid #E0A800; /* Optional: Add a subtle border */
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    border-color: #dc3545;
+}
+
+.alert-info {
+    background-color: #d1ecf1;
+    color: #0c5460;
+}

@@ -1,16 +1,17 @@
 # PowerCurve: Strava Power Curve Web App
-
-PowerCurve is a Flask-based web application that allows users to connect their Strava accounts, authorize access, and analyze their cycling power curve data. The app is designed for cyclists who want to visualize and compare their power output over different durations, using data pulled directly from Strava.
+PowerCurve is a Flask-based web application that lets cyclists connect their Strava accounts, analyze their cycling power curve data, and compare performance with other users. The app securely pulls activity data from Strava, computes power curves, and visualizes results for easy analysis.
 
 ---
 
 ## Features
 
-- **Strava OAuth2 Integration:** Securely authorize with Strava to access your activity data.
-- **Power Curve Visualization:** Generate and view your power curve from recent rides.
+- **Strava OAuth2 Integration:** Secure login and authorization with Strava to access your activity data.
+- **Power Curve Visualization:** Generate and view your power curve from your last 5 rides.
+- **Compare Power Curves:** Compare your power curve with other users who have authorized the app.
 - **User Management:** Multi-user support with unique Strava-linked accounts.
 - **Dummy Data Support:** Easily populate the database with test users and power curves for development.
 - **Automatic Database Handling:** The app checks for the existence of the database and creates it if missing.
+- **GDPR-Compliant Data Deletion:** Users can delete their data and log out at any time.
 - **Simple, Modern Flask Codebase:** Easy to extend and maintain.
 
 ---
@@ -21,65 +22,73 @@ PowerCurve is a Flask-based web application that allows users to connect their S
 
 - Python 3.8+
 - [pip](https://pip.pypa.io/en/stable/)
-- A Strava API application (get your client ID, secret, and set a redirect URI at https://www.strava.com/settings/api)
+- A Strava API application (get your client ID, secret, and set a redirect URI at [Strava API Settings](https://www.strava.com/settings/api))
 
 ### Installation
 
 1. **Clone the repository:**
-   ```sh
-   git clone https://github.com/themp731/PowerCurve.git
-   cd PowerCurve
-   ```
-
+  ```sh
+  git clone https://github.com/themp731/PowerCurve.git
+  cd PowerCurve
+  ```
 2. **Create and activate a virtual environment:**
-   ```sh
-   python -m venv venv
-   # Windows
-   venv\Scripts\activate
-   # macOS/Linux
-   source venv/bin/activate
-   ```
-
+  ```sh
+  python -m venv venv
+  # Windows
+  venv\Scripts\activate
+  # macOS/Linux
+  source venv/bin/activate
+  ```
 3. **Install the required packages:**
-   ```sh
-   pip install -r requirements.txt
-   ```
-
+  ```sh
+  pip install -r requirements.txt
+  ```
 4. **Set up your Strava API credentials:**
-   - Copy `example.env` to `.env`
-   - Fill in your Strava `CLIENT_ID`, `CLIENT_SECRET`, and `REDIRECT_URI`
+  - Copy `example.env` to `.env`
+  - Fill in your Strava `CLIENT_ID`, `CLIENT_SECRET`, and `REDIRECT_URI`
 
 5. **Run the application:**
-   ```sh
-   flask run
-   ```
-   Access the app at `http://127.0.0.1:5000`.
+  ```sh
+  python main.py
+  ```
+  Access the app at [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ---
 
-## Template Files Explained
+## Project Structure
 
-The `templates` folder contains all the HTML files used by Flask to render pages. Here’s what each file does:
+Here’s an overview of the folder structure and the purpose of each file:
 
-- **base.html**  
-  The main layout template. It defines the overall HTML structure, navigation bar, and a `{% block content %}` placeholder where page-specific content is inserted. All other templates extend this file to ensure a consistent look and navigation across the site.
+```
+PowerCurve/
+├── instance/           # Contains the SQLite database file (powercurve.db)
+├── templates/          # HTML templates for Flask pages
+│   ├── base.html            # Base template with shared layout and blocks for other pages to extend
+│   ├── compare.html         # Page for comparing power curves between users
+│   ├── home.html            # Main dashboard after login, showing user stats and power curve
+│   ├── landing.html         # Landing page for unauthenticated users, app intro and login prompt
+│   ├── powercurve.html      # Detailed visualization of the user's power curve data
+│   └── privacy_policy.html  # Privacy policy and GDPR compliance information
+├── static/             # Static assets (CSS, JS, images) — *not used yet*
+│   ├── css/
+│   ├── js/
+│   └── images/
+├── utils/              # Utility scripts
+│   ├── dummy_data.py       # Script to populate the database with test users and power curves
+│   ├── pretty_print.py     # Helper functions for formatting and displaying data
+│   └── rebuild_db.py       # Script to reset and rebuild the database
+├── models.py           # SQLAlchemy models (User, PowerCurve)
+├── routes.py           # Flask routes (login, logout, data deletion, etc.)
+├── main.py             # Entry point for the Flask app
+├── requirements.txt    # Python dependencies
+└── Procfile            # Elastic Beanstalk process file
 
-- **landing.html**  
-  The public landing page for users who are **not logged in**. It welcomes new users and provides a single "Log in with Strava" button. If a user is already logged in, they are redirected to the home page.
+```
 
-- **home.html**  
-  The dashboard page for **logged-in users**. It greets the user (using their Strava name or ID), and provides links to update their Strava PowerCurve, compare power curves, and log out. This page is only accessible after logging in with Strava.
+---
 
-- **login.html**  
-  (Legacy, not used in Strava-only login) Previously used for username/password login. If you switch to Strava-only authentication, you can remove or repurpose this file to simply direct users to "Log in with Strava."
+## Deployment to Elastic Beanstalk
 
-- **signup.html**  
-  (Legacy, not used in Strava-only login) Previously used for account creation with username/password. With Strava-only authentication, you can remove or repurpose this file as well.
-
-### How `base.html`, `landing.html`, and `home.html` Differ
-
-- **base.html** is the foundation for all pages. It contains the HTML `<head>`, navigation bar, and a content block. Other templates extend it and fill in the `{% block content %}` section with their own content.
-- **landing.html** is shown to users who are not logged in. It extends `base.html` and provides a welcome message and a "Log in with Strava" button.
-- **home.html** is shown to users who are logged in. It also extends `base.html`, but displays personalized content and links relevant to authenticated users.
-
-This structure keeps your site organized, makes it easy to update navigation or layout in one place (`base.html`), and ensures users see the right content based on their authentication status.
+1. Ensure the `beanstalk1` branch is up-to-date with your changes.
+2. Push the branch to the remote repository.
+3. Deploy the branch to Elastic Beanstalk using the AWS Management Console or CLI.
