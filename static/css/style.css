@@ -8,10 +8,10 @@ h1, h2 {
 }
 
 footer {
+    background-color: #FFF3CD; /* Light yellow/orange */
+    color: #856404; /* Darker text for contrast */
     font-size: 0.9em;
-    background-color: #ffffff; /* Set background to white */
-    color: #000000; /* Set text color to black for contrast */
-    border-top: 1px solid #e0e0e0; /* Optional: Add a subtle border for separation */
+    border-top: 1px solid #E0A800; /* Optional: Add a subtle border */
 }
 
 .btn-danger {
