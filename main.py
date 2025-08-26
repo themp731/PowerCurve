@@ -31,6 +31,8 @@ if len(sys.argv) > 1 and sys.argv[1] == "dev":
     app.config['FLASK_ENV'] = 'development'
     print("Running in Development Mode (SQLite)")
 else:
+    # The OS Environment Variables should be stored within the configuration of the 
+    # elastic beanstalk application
     app.config['SQLALCHEMY_DATABASE_URI'] = (
         f"postgresql+psycopg2://{os.getenv('RDS_USERNAME')}:{os.getenv('RDS_PASSWORD')}"
         f"@{os.getenv('RDS_HOSTNAME')}:{os.getenv('RDS_PORT')}/{os.getenv('RDS_DB_NAME')}"
