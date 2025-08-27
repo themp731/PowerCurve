@@ -36,7 +36,6 @@ else:
     app.config['SQLALCHEMY_DATABASE_URI'] = (
         f"postgresql+psycopg2://{os.getenv('RDS_USERNAME')}:{os.getenv('RDS_PASSWORD')}"
         f"@{os.getenv('RDS_HOSTNAME')}:{os.getenv('RDS_PORT')}/{os.getenv('RDS_DB_NAME')}"
-        f"?pool_size=10&max_overflow=20"
     )
     app.config['FLASK_ENV'] = 'production'
     print("Running in Production Mode (RDS)")
