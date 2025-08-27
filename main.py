@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import io
 import base64
 # SQLAlchemy for database handling
+import psycopg
 from flask_sqlalchemy import SQLAlchemy
 from models import db, User, PowerCurve
 from utils.dummy_data import create_dummy_data
@@ -34,7 +35,7 @@ else:
     # The OS Environment Variables should be stored within the configuration of the 
     # elastic beanstalk application
     app.config['SQLALCHEMY_DATABASE_URI'] = (
-        f"postgresql+psycopg2://{os.getenv('RDS_USERNAME')}:{os.getenv('RDS_PASSWORD')}"
+        f"postgresql+psycopg://{os.getenv('RDS_USERNAME')}:{os.getenv('RDS_PASSWORD')}"
         f"@{os.getenv('RDS_HOSTNAME')}:{os.getenv('RDS_PORT')}/{os.getenv('RDS_DB_NAME')}"
     )
     app.config['FLASK_ENV'] = 'production'
