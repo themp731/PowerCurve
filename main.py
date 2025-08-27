@@ -3,6 +3,7 @@
 from flask import Flask, redirect, request, session, render_template, flash, url_for
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 import os
+import sys
 import numpy as np
 from dotenv import load_dotenv
 import requests
@@ -12,6 +13,8 @@ import matplotlib.pyplot as plt
 import io
 import base64
 # SQLAlchemy for database handling
+import psycopg
+from flask_sqlalchemy import SQLAlchemy
 from models import db, User, PowerCurve
 from utils.dummy_data import create_dummy_data
 from utils.pretty_print import pretty_print, print_db_state
@@ -23,31 +26,23 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # Secret key for session management
 # Configure SQLAlchemy to link to Flask
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///powercurve.db'
+# Determine the mode (dev or prod) based on command-line arguments
+if len(sys.argv) > 1 and sys.argv[1] == "dev":
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('SQLALCHEMY_DATABASE_URI_DEV')
+    app.config['FLASK_ENV'] = 'development'
+    print("Running in Development Mode (SQLite)")
+else:
+    # The OS Environment Variables should be stored within the configuration of the 
+    # elastic beanstalk application
+    app.config['SQLALCHEMY_DATABASE_URI'] = (
+        f"postgresql+psycopg://{os.getenv('RDS_USERNAME')}:{os.getenv('RDS_PASSWORD')}"
+        f"@{os.getenv('RDS_HOSTNAME')}:{os.getenv('RDS_PORT')}/{os.getenv('RDS_DB_NAME')}"
+    )
+    app.config['FLASK_ENV'] = 'production'
+    print("Running in Production Mode (RDS)")
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
-
-# --- Automatic DB schema check and rebuild ---
-# NOTE: This code is commented out due to a looping error. Needs fixing later.
-# def check_and_rebuild_db():
-#     from sqlalchemy.exc import OperationalError
-#     import sys
-#     try:
-#         with app.app_context():
-#             from sqlalchemy import text
-#             # Check user table columns
-#             db.session.execute(text("SELECT id, username, password_hash, strava_id, access_token, username FROM user LIMIT 1"))
-#             # Check power_curve table columns
-#             db.session.execute(text("SELECT id, user_id, username, activity_id, curve, created_at FROM power_curve LIMIT 1"))
-#     except OperationalError:
-#         print("Database schema mismatch detected. Rebuilding database...")
-#         # We use subprocess here because rebuilding the database (deleting and recreating the file)
-#         # while the Flask app is running can cause issues with open connections and cached models.
-#         # Running the rebuild as a separate process ensures a clean rebuild and avoids side effects.
-#         import subprocess
-#         subprocess.run([sys.executable, os.path.join(os.path.dirname(__file__), 'utils', 'rebuild_db.py')])
-#         print("Database rebuild complete.")
-# check_and_rebuild_db()
 
 # Create the database tables if they don't exist
 if not os.path.exists('powercurve.db'):

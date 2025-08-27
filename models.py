@@ -4,15 +4,6 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 from flask import Flask
 
-
-# Create Flask app and ensure instance folder exists
-app = Flask(__name__, instance_relative_config=True)
-os.makedirs(app.instance_path, exist_ok=True)
-
-# Set the database URI to use the instance folder
-app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(app.instance_path, 'powercurve.db')}"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
 # Create a SLQAlchemy instance
 db = SQLAlchemy()
 
